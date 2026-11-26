@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
+import time
+from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-# Theme palette per vendor: accent (top bar & text), border, background, divider
+# Theme palette per vendor: accent (top bar & text), border, background, divider, pill_bg
 MAKER_THEMES: dict[str, dict[str, str]] = {
     "anthropic": {
         "label": "Anthropic · Claude",
@@ -11,6 +14,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#e88b84",
         "bg": "#fff6f5",
         "divider": "#f0c2be",
+        "pill_bg": "#fde4e2",
     },
     "openai": {
         "label": "OpenAI · GPT",
@@ -18,6 +22,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#e5b85c",
         "bg": "#fffbf0",
         "divider": "#f0d9a3",
+        "pill_bg": "#fdf0cf",
     },
     "google": {
         "label": "Google · Gemini",
@@ -25,6 +30,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#7fb0eb",
         "bg": "#f2f8ff",
         "divider": "#bdd7f6",
+        "pill_bg": "#ddebfd",
     },
     "deepseek": {
         "label": "DeepSeek",
@@ -32,6 +38,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#68ccb6",
         "bg": "#effcf9",
         "divider": "#b0e6da",
+        "pill_bg": "#d6f5ed",
     },
     "qwen": {
         "label": "Alibaba · Qwen",
@@ -39,6 +46,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#a992ea",
         "bg": "#f7f4ff",
         "divider": "#d3c6f5",
+        "pill_bg": "#e8e0fc",
     },
     "z-ai": {
         "label": "Z.ai · GLM",
@@ -46,6 +54,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#8ea2ea",
         "bg": "#f3f6ff",
         "divider": "#c4cef5",
+        "pill_bg": "#dfe6fc",
     },
     "moonshotai": {
         "label": "Moonshot · Kimi",
@@ -53,6 +62,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#df8ab9",
         "bg": "#fff4fa",
         "divider": "#f0c2dc",
+        "pill_bg": "#fbe0ef",
     },
     "x-ai": {
         "label": "xAI · Grok",
@@ -60,6 +70,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#9aa8ba",
         "bg": "#f6f8fa",
         "divider": "#cfd7e2",
+        "pill_bg": "#e5eaf0",
     },
     "meta": {
         "label": "Meta",
@@ -67,6 +78,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#84aee9",
         "bg": "#f3f7ff",
         "divider": "#c2d7f6",
+        "pill_bg": "#dfeafe",
     },
     "mistralai": {
         "label": "Mistral",
@@ -74,6 +86,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#eaa475",
         "bg": "#fff7f2",
         "divider": "#f4cdb4",
+        "pill_bg": "#fde7d8",
     },
     "minimax": {
         "label": "MiniMax",
@@ -81,6 +94,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#e594a7",
         "bg": "#fff5f7",
         "divider": "#f2c6d0",
+        "pill_bg": "#fbe1e7",
     },
     "tencent": {
         "label": "Tencent · Hunyuan",
@@ -88,6 +102,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#7cb8e5",
         "bg": "#f2f9ff",
         "divider": "#bcdcf4",
+        "pill_bg": "#dcedfb",
     },
     "xiaomi": {
         "label": "Xiaomi · MiMo",
@@ -95,6 +110,7 @@ MAKER_THEMES: dict[str, dict[str, str]] = {
         "border": "#e8a572",
         "bg": "#fff7f0",
         "divider": "#f2cdb0",
+        "pill_bg": "#fde8d7",
     },
 }
 
@@ -104,6 +120,7 @@ DEFAULT_THEME: dict[str, str] = {
     "border": "#a0aec0",
     "bg": "#f7f9fc",
     "divider": "#cbd5e1",
+    "pill_bg": "#e8edf3",
 }
 
 MAKER_ALIASES: dict[str, str] = {
@@ -123,10 +140,12 @@ MAKER_ALIASES: dict[str, str] = {
     "通义": "qwen",
     "千问": "qwen",
     "阿里": "qwen",
+    "alibaba": "qwen",
     "glm": "z-ai",
     "zhipu": "z-ai",
     "智谱": "z-ai",
     "z-ai": "z-ai",
+    "zai": "z-ai",
     "kimi": "moonshotai",
     "moonshot": "moonshotai",
     "月之暗面": "moonshotai",
@@ -144,24 +163,227 @@ MAKER_ALIASES: dict[str, str] = {
     "小米": "xiaomi",
 }
 
+EFFORT_ORDER: dict[str, int] = {
+    "ultra": 0,
+    "max": 1,
+    "xhigh": 2,
+    "high": 3,
+    "medium": 4,
+    "low": 5,
+    "minimal": 6,
+    "reasoning": 7,
+    "non-reasoning": 8,
+    "": 9,
+}
+
+EFFORT_ALIASES: dict[str, str] = {
+    "ultra": "ultra",
+    "max": "max",
+    "xhigh": "xhigh",
+    "high": "high",
+    "medium": "medium",
+    "med": "medium",
+    "low": "low",
+    "minimal": "minimal",
+    "min": "minimal",
+    "reasoning": "reasoning",
+    "推理": "reasoning",
+    "non-reasoning": "non-reasoning",
+    "nonreasoning": "non-reasoning",
+    "无推理": "non-reasoning",
+    "不推理": "non-reasoning",
+}
+
+_MAJOR_GEN_SERIES = ("gemini", "gpt", "claude")
+
+_DATE_CODE_RE = re.compile(
+    r"(?:\b20\d{2}-\d{2}-\d{2}\b|\(\d{4}\)|\b(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\b|\b2[4-9](?:0[1-9]|1[0-2])\b)"
+)
+_VERSION_RE = re.compile(r"(?<![a-z0-9])(?:v|k|m)?(\d+(?:\.\d+)?)(?![a-z0-9]*b\b)", re.I)
+
+
+def _extract_lineage_info(
+    maker: str, release_name: str
+) -> tuple[str, tuple[int, ...], int, str | None, int | None]:
+    """Parse a release name into (lineage_key, version_tuple, date_code, major_series, major_ver)."""
+    clean = release_name.strip().lower()
+    clean = re.sub(r"\(free\)|\(preview\)|\bpreview\b", "", clean)
+    clean = re.sub(r"[_/]+", " ", clean)
+
+    # Extract snapshot date codes like 1017, 0813, 0423, (0902), 2026-02-15
+    date_code = 0
+    for dm in _DATE_CODE_RE.finditer(clean):
+        digits = re.sub(r"\D", "", dm.group(0))
+        if digits:
+            val = int(digits)
+            if val > date_code:
+                date_code = val
+    no_date = _DATE_CODE_RE.sub(" ", clean)
+
+    # Normalize hyphens for matching while preserving word boundaries
+    tokens_str = re.sub(r"[-]+", " ", no_date)
+    tokens_str = re.sub(r"\s+", " ", tokens_str).strip()
+
+    # Check major named series (gemini 4, gpt 6.2, claude ... 5.2)
+    major_series: str | None = None
+    for s in _MAJOR_GEN_SERIES:
+        if re.search(rf"\b{s}\b", tokens_str):
+            major_series = s
+            break
+
+    # Extract primary version (skip parameter sizes like 27b, 120b, 397b, 31b)
+    ver_tuple: tuple[int, ...] = (0,)
+    major_ver: int | None = None
+    ver_match = re.search(
+        r"(?:\b(?:gpt|gemini|claude|qwen|glm|grok)\s*|\bv|\bk|\bm|\s)(\d+(?:\.\d+)?)(?=\s|$)",
+        tokens_str,
+    )
+    if ver_match:
+        parts = ver_match.group(1).split(".")
+        ver_tuple = tuple(int(p) for p in parts)
+        major_ver = ver_tuple[0]
+        # Remove just the version number from lineage_key
+        s_idx, e_idx = ver_match.span(1)
+        lineage_raw = tokens_str[:s_idx] + " " + tokens_str[e_idx:]
+    else:
+        lineage_raw = tokens_str
+
+    # Remove dangling single-letter version prefixes like "v", "k", "m" before the stripped number
+    lineage_raw = re.sub(r"\b[vkm]\b", " ", lineage_raw)
+    # Remove "next" suffix for lineage matching? Keep distinct tiers like flash / pro / max / ultra / lite / astra / sol / terra / luna / fable / opus / sonnet / haiku
+    lineage_key = re.sub(r"\s+", " ", lineage_raw).strip()
+    return f"{maker}:{lineage_key}", ver_tuple, date_code, major_series, major_ver
+
+
+def filter_outdated_models(
+    models: list[dict[str, Any]],
+    *,
+    max_age_days: int = 180,
+    keep_free_variants: bool = False,
+    now_ts: float | None = None,
+) -> list[dict[str, Any]]:
+    """Filter out deprecated, ancient, and superseded older-version models.
+
+    Operates at the release level so all reasoning-effort variants of an active release
+    are preserved together, while superseded releases are removed completely.
+    """
+    now = now_ts if now_ts is not None else time.time()
+    cutoff_ts = now - max_age_days * 86400 if max_age_days > 0 else 0.0
+
+    # Group variants by (maker, release_slug)
+    releases: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
+    for m in models:
+        if m.get("deprecated"):
+            continue
+        is_free_id = str(m.get("id") or "").endswith(":free")
+        if is_free_id and not keep_free_variants:
+            continue
+        if keep_free_variants:
+            pin = m.get("price_in")
+            pout = m.get("price_out")
+            if (pin is None and pout is None) or (pin or 0) != 0 or (pout or 0) != 0:
+                continue
+        maker = str(m.get("maker") or "other").lower()
+        rel_slug = str(m.get("release_slug") or m.get("id") or "").strip().lower()
+        releases[(maker, rel_slug)].append(m)
+
+    # Step 1: Age filter & parse lineage metadata per release
+    active_releases: dict[tuple[str, str], dict[str, Any]] = {}
+    for key, variants in releases.items():
+        maker, _ = key
+        # Representative timestamp & name
+        created_values = [v["created_ts"] for v in variants if v.get("created_ts")]
+        created_ts = max(created_values) if created_values else None
+        if cutoff_ts > 0 and created_ts is not None and created_ts < cutoff_ts:
+            continue
+
+        rel_name = str(variants[0].get("release_name") or variants[0].get("name") or "")
+        lineage_key, ver_tuple, date_code, major_series, major_ver = _extract_lineage_info(
+            maker, rel_name
+        )
+        best_iq = max(
+            (v["iq"] for v in variants if isinstance(v.get("iq"), (int, float))),
+            default=-1.0,
+        )
+        active_releases[key] = {
+            "maker": maker,
+            "variants": variants,
+            "rel_name": rel_name,
+            "lineage_key": lineage_key,
+            "ver_tuple": ver_tuple,
+            "date_code": date_code,
+            "major_series": major_series,
+            "major_ver": major_ver,
+            "created_ts": created_ts or 0.0,
+            "best_iq": best_iq,
+        }
+
+    # Step 2: Major-generation pruning for flagship series (e.g. Gemini 4 drops Gemini 3.x;
+    # GPT-6 drops GPT-5.x; Claude 5 drops Claude 4.x) when >=2 releases exist in the newer gen.
+    series_gen_counts: dict[tuple[str, str], dict[int, int]] = defaultdict(
+        lambda: defaultdict(int)
+    )
+    for info in active_releases.values():
+        if info["major_series"] and info["major_ver"] is not None:
+            series_gen_counts[(info["maker"], info["major_series"])][info["major_ver"]] += 1
+
+    series_min_major: dict[tuple[str, str], int] = {}
+    for skey, gen_counts in series_gen_counts.items():
+        # Highest major generation that already has >= 2 active releases
+        qualifying = [gen for gen, cnt in gen_counts.items() if cnt >= 2]
+        if qualifying:
+            series_min_major[skey] = max(qualifying)
+
+    after_gen_prune: dict[tuple[str, str], dict[str, Any]] = {}
+    for key, info in active_releases.items():
+        if info["major_series"] and info["major_ver"] is not None:
+            min_gen = series_min_major.get((info["maker"], info["major_series"]))
+            if min_gen is not None and info["major_ver"] < min_gen:
+                continue
+        after_gen_prune[key] = info
+
+    # Step 3: Same-lineage version deduplication (e.g. Fable 5.2 drops 5.1;
+    # GPT-6.2 Astra drops GPT-6 Astra; DeepSeek V4 Pro 0813 drops 0423; Qwen4 Max drops Qwen3.8 Max)
+    by_lineage: dict[str, list[tuple[tuple[str, str], dict[str, Any]]]] = defaultdict(list)
+    for key, info in after_gen_prune.items():
+        by_lineage[info["lineage_key"]].append((key, info))
+
+    kept_keys: set[tuple[str, str]] = set()
+    for _, entries in by_lineage.items():
+        if len(entries) == 1:
+            kept_keys.add(entries[0][0])
+            continue
+        # Pick the newest version -> newest snapshot date_code -> newest created_ts -> highest IQ
+        best_key, _ = max(
+            entries,
+            key=lambda item: (
+                item[1]["ver_tuple"],
+                item[1]["date_code"],
+                item[1]["created_ts"],
+                item[1]["best_iq"],
+            ),
+        )
+        kept_keys.add(best_key)
+
+    result: list[dict[str, Any]] = []
+    for key in kept_keys:
+        result.extend(after_gen_prune[key]["variants"])
+    return result
+
 
 def _fmt_num(value: float) -> str:
     if value == 0:
         return "0"
+    if value >= 100:
+        return f"{value:.0f}"
     if value >= 10:
         s = f"{value:.1f}"
-    elif value >= 1:
-        s = f"{value:.2f}"
     else:
         s = f"{value:.2f}"
     return s.rstrip("0").rstrip(".")
 
 
-def _format_price(pricing: dict[str, Any] | None) -> str:
-    if not pricing:
-        return "--"
-    pin = pricing.get("input")
-    pout = pricing.get("output")
+def _format_price(pin: float | None, pout: float | None) -> str:
     if pin is None and pout is None:
         return "--"
     pin_f = float(pin) if pin is not None else 0.0
@@ -171,78 +393,159 @@ def _format_price(pricing: dict[str, Any] | None) -> str:
     return f"${_fmt_num(pin_f)}/${_fmt_num(pout_f)}"
 
 
-def _blended_price(pricing: dict[str, Any] | None) -> float | None:
-    if not pricing:
-        return None
-    pin = pricing.get("input")
-    pout = pricing.get("output")
-    if pin is None or pout is None:
-        return None
-    return (3.0 * float(pin) + float(pout)) / 4.0
+def _format_task_cost(cost: float | None) -> str:
+    if cost is None:
+        return ""
+    if cost >= 10:
+        return f"题均 ${_fmt_num(cost)}"
+    if cost >= 0.1:
+        return f"题均 ${cost:.2f}"
+    return f"题均 ${cost:.3f}"
 
 
-def _format_perf(perf: dict[str, Any] | None) -> str:
-    if not perf:
-        return "--"
-    tps = perf.get("throughput_tps")
-    lat = perf.get("latency_ms")
+def _format_perf(tps: float | None, latency_s: float | None) -> str:
     parts: list[str] = []
-    if tps is not None:
-        parts.append(f"{round(float(tps))}t/s")
-    if lat is not None:
-        lat_f = float(lat)
-        if lat_f >= 1000:
-            parts.append(f"{lat_f / 1000:.1f}s")
+    if isinstance(tps, (int, float)) and tps > 0:
+        parts.append(f"{round(tps)}t/s")
+    if isinstance(latency_s, (int, float)) and latency_s > 0:
+        if latency_s >= 10.0:
+            parts.append(f"{round(latency_s)}s")
+        elif latency_s >= 1.0:
+            parts.append(f"{latency_s:.1f}s")
         else:
-            parts.append(f"{round(lat_f)}ms")
+            parts.append(f"{round(latency_s * 1000)}ms")
     return " · ".join(parts) if parts else "--"
 
 
-def _shorten_name(model: dict[str, Any]) -> str:
-    name = str(model.get("name") or model.get("id") or "Unknown").strip()
-    if ": " in name:
-        name = name.split(": ", 1)[1].strip()
-    # Remove redundant trailing "(free)" if price already says FREE
+def _blended_price(m: dict[str, Any]) -> float | None:
+    pin = m.get("price_in")
+    pout = m.get("price_out")
+    if pin is None and pout is None:
+        return None
+    pin_f = float(pin) if pin is not None else 0.0
+    pout_f = float(pout) if pout is not None else 0.0
+    return (3.0 * pin_f + pout_f) / 4.0
+
+
+def _clean_display_name(m: dict[str, Any]) -> str:
+    name = str(m.get("release_name") or m.get("name") or "").strip()
+    if ":" in name:
+        name = name.split(":", 1)[1].strip()
+    name = re.sub(r"\s*\(free\)\s*$", "", name, flags=re.I)
     return name
 
 
-def _theme_for(maker: str) -> dict[str, str]:
-    theme = MAKER_THEMES.get(maker)
-    if theme:
-        return theme
-    return {**DEFAULT_THEME, "label": maker.upper() if maker else "Other"}
+def _effort_sort_key(m: dict[str, Any]) -> tuple[int, float]:
+    ef = str(m.get("effort") or "").lower()
+    order = EFFORT_ORDER.get(ef, 8)
+    iq = float(m["iq"]) if isinstance(m.get("iq"), (int, float)) else -1.0
+    return (order, -iq)
 
 
 def _to_card(
-    model: dict[str, Any],
-    score_key: str = "intelligence",
-    extra_badge: str = "",
+    m: dict[str, Any],
+    *,
+    score_key: str = "iq",
+    badge: str = "",
 ) -> dict[str, Any]:
-    maker = str(model.get("maker") or "").lower()
-    theme = _theme_for(maker)
-    aa = (model.get("benchmarks") or {}).get("artificial_analysis") or {}
-    raw_score = aa.get(score_key)
-    if raw_score is None and score_key != "intelligence":
-        raw_score = aa.get("intelligence")
-    score_text = f"{float(raw_score):.1f}" if raw_score is not None else "--"
-
+    maker = str(m.get("maker") or "other").lower()
+    theme = MAKER_THEMES.get(maker, DEFAULT_THEME)
+    val = m.get(score_key)
+    score_str = f"{float(val):.1f}" if isinstance(val, (int, float)) else "--"
+    effort_label = str(m.get("effort_label") or "").strip()
+    effort_key = str(m.get("effort") or "").lower()
     return {
-        "name": _shorten_name(model),
-        "maker": maker,
-        "maker_label": theme["label"],
-        "score": score_text,
-        "price": _format_price(model.get("pricing")),
-        "perf": _format_perf(model.get("performance")),
-        "badge": extra_badge,
+        "name": _clean_display_name(m),
+        "effort": effort_label,
+        "effort_key": effort_key,
+        "score": score_str,
+        "price": _format_price(m.get("price_in"), m.get("price_out")),
+        "task_cost": _format_task_cost(m.get("cost_per_task")),
+        "perf": _format_perf(m.get("tps"), m.get("latency_s")),
+        "badge": badge,
         "accent": theme["accent"],
         "border": theme["border"],
         "bg": theme["bg"],
         "divider": theme["divider"],
+        "pill_bg": theme["pill_bg"],
     }
 
 
 def _chunk(items: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def _group_release_rows(
+    items: list[dict[str, Any]],
+    *,
+    max_releases: int | None,
+    max_per_row: int,
+    score_key: str = "iq",
+) -> list[dict[str, Any]]:
+    """Group items of one maker into centered rows:
+    - Multi-effort releases get their own dedicated row (ordered strongest -> lightest effort).
+    - Single-effort releases of the same maker are packed neatly into shared rows.
+    """
+    by_rel: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for m in items:
+        rslug = str(m.get("release_slug") or m.get("id") or "")
+        by_rel[rslug].append(m)
+
+    # Sort releases by best score descending
+    sorted_rels = sorted(
+        by_rel.values(),
+        key=lambda grp: max(
+            (float(x[score_key]) for x in grp if isinstance(x.get(score_key), (int, float))),
+            default=-1.0,
+        ),
+        reverse=True,
+    )
+    if max_releases is not None:
+        sorted_rels = sorted_rels[:max_releases]
+
+    rows: list[dict[str, Any]] = []
+    singles_buf: list[dict[str, Any]] = []
+
+    def _flush_singles() -> None:
+        nonlocal singles_buf
+        if singles_buf:
+            for chunk in _chunk(singles_buf, max_per_row):
+                rows.append({"cards": [_to_card(m, score_key=score_key) for m in chunk]})
+            singles_buf = []
+
+    for grp in sorted_rels:
+        grp_sorted = sorted(grp, key=_effort_sort_key)
+        if len(grp_sorted) == 1:
+            if rows and len(rows[-1]["cards"]) <= 2 and len(rows[-1]["cards"]) + 1 <= max_per_row:
+                rows[-1]["cards"].append(_to_card(grp_sorted[0], score_key=score_key))
+            else:
+                singles_buf.append(grp_sorted[0])
+        else:
+            _flush_singles()
+            for chunk in _chunk(grp_sorted, max_per_row):
+                rows.append({"cards": [_to_card(m, score_key=score_key) for m in chunk]})
+    _flush_singles()
+    return rows
+
+
+def _parse_query_tokens(query: str) -> tuple[str, str | None, bool]:
+    """Parse query into (remaining_query, effort_filter, include_all_flag)."""
+    tokens = query.strip().split()
+    include_all = False
+    effort_filter: str | None = None
+    rest: list[str] = []
+
+    for tok in tokens:
+        lo = tok.lower()
+        if lo in {"all", "--all", "全部", "含旧", "历史"}:
+            include_all = True
+            continue
+        if lo in EFFORT_ALIASES and effort_filter is None:
+            effort_filter = EFFORT_ALIASES[lo]
+            continue
+        rest.append(tok)
+
+    return " ".join(rest).strip(), effort_filter, include_all
 
 
 def build_view_data(
@@ -252,149 +555,180 @@ def build_view_data(
     max_per_maker: int,
     max_ranking_items: int,
     fetched_at: float,
+    *,
+    source: str = "artificial_analysis",
     is_stale: bool = False,
+    filter_outdated: bool = True,
+    max_model_age_days: int = 180,
+    max_releases_per_maker: int = 2,
 ) -> dict[str, Any]:
-    """Prepare structured rows & cards for Jinja2 HTML rendering."""
-    q = query.strip().lower()
-    updated_str = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d %H:%M")
-    stale_note = "（上游暂不可用，显示缓存）" if is_stale else ""
+    """Select, filter, sort, and group models into card rows for HTML rendering."""
+    raw_q, effort_filter, include_all = _parse_query_tokens(query)
+    q_lower = raw_q.lower()
+    per_row = max(3, min(6, max_per_maker))
+
+    is_free_mode = q_lower in {"free", "免费", "白嫖"}
+    apply_outdated_filter = filter_outdated and not include_all
+
+    working = list(models)
+    if apply_outdated_filter:
+        working = filter_outdated_models(
+            working,
+            max_age_days=max_model_age_days,
+            keep_free_variants=is_free_mode,
+        )
+    elif not is_free_mode:
+        working = [m for m in working if not str(m.get("id") or "").endswith(":free")]
+
+    if effort_filter is not None:
+        working = [m for m in working if str(m.get("effort") or "").lower() == effort_filter]
+
+    effort_tag = f" · 推理强度: {effort_filter}" if effort_filter else ""
+    all_tag = " · 含旧代模型" if include_all else ""
 
     rows: list[dict[str, Any]] = []
     title = "AI 模型实时智商榜"
-    subtitle = "智商指数（AA）· 价格 $/1M Tokens（入/出）· 速度 & 首字延迟"
+    subtitle = (
+        f"左下 AA 智商分 · 型号下方为推理强度 · 右上 API 单价 ($/1M) 与题均成本 · 右下速度 & 首答延迟"
+        f"{effort_tag}{all_tag}"
+    )
 
-    # Mode 1: Coding leaderboard
-    if q in {"coding", "code", "编程", "代码"}:
+    if q_lower in {"coding", "code", "编程", "代码"}:
         title = "AI 模型编程跑分榜 (Coding)"
-        subtitle = "按 Artificial Analysis 编程指数降序 · 价格 $/1M（入/出）· 速度 & 延迟"
-        scored = [
-            m
-            for m in models
-            if ((m.get("benchmarks") or {}).get("artificial_analysis") or {}).get("coding")
-            is not None
-        ]
-        scored.sort(
-            key=lambda m: float(m["benchmarks"]["artificial_analysis"]["coding"]),
-            reverse=True,
+        subtitle = (
+            f"按编程评测综合分降序 · 含各推理强度档位 · 速度 & 首答延迟{effort_tag}{all_tag}"
         )
+        ranked = [m for m in working if isinstance(m.get("coding"), (int, float))]
+        ranked.sort(key=lambda m: float(m["coding"]), reverse=True)
         cards = [
-            _to_card(m, score_key="coding", extra_badge=f"#{idx}")
-            for idx, m in enumerate(scored[:max_ranking_items], start=1)
+            _to_card(m, score_key="coding", badge=f"#{i + 1}")
+            for i, m in enumerate(ranked[:max_ranking_items])
         ]
-        for group in _chunk(cards, 6):
-            rows.append({"cards": group})
+        rows = [{"cards": chunk} for chunk in _chunk(cards, per_row)]
 
-    # Mode 2: Best value (IQ / blended price)
-    elif q in {"value", "性价比", "便宜", "划算"}:
-        title = "AI 模型性价比榜 (智商 ÷ 综合单价)"
-        subtitle = "综合单价 = (3×输入 + 输出) / 4 · 仅统计付费且具备智商分模型"
-        scored: list[tuple[float, dict[str, Any]]] = []
-        for m in models:
-            iq = ((m.get("benchmarks") or {}).get("artificial_analysis") or {}).get(
-                "intelligence"
-            )
-            bp = _blended_price(m.get("pricing"))
-            if iq is not None and bp is not None and bp > 0:
-                scored.append((float(iq) / bp, m))
-        scored.sort(key=lambda item: item[0], reverse=True)
-        cards = [
-            _to_card(m, score_key="intelligence", extra_badge=f"#{idx}")
-            for idx, (_, m) in enumerate(scored[:max_ranking_items], start=1)
-        ]
-        for group in _chunk(cards, 6):
-            rows.append({"cards": group})
-
-    # Mode 3: Free models
-    elif q in {"free", "免费", "白嫖"}:
-        title = "免费 AI 模型智商榜 ($0)"
-        subtitle = "按智商指数降序 · 0 成本模型 · 速度 & 首字延迟"
-        free_models = []
-        for m in models:
-            p = m.get("pricing") or {}
-            if p.get("input") == 0 and p.get("output") == 0:
-                free_models.append(m)
-        free_models.sort(
-            key=lambda m: float(
-                ((m.get("benchmarks") or {}).get("artificial_analysis") or {}).get(
-                    "intelligence"
-                )
-                or -1.0
-            ),
-            reverse=True,
+    elif q_lower in {"value", "性价比", "划算", "便宜"}:
+        title = "AI 模型性价比榜"
+        has_task_cost = any(isinstance(m.get("cost_per_task"), (int, float)) for m in working)
+        subtitle = (
+            f"按「智商 ÷ {'题均成本' if has_task_cost else '综合单价'}」降序（仅限智商 ≥ 20）"
+            f"{effort_tag}{all_tag}"
         )
-        cards = [_to_card(m) for m in free_models[:max_ranking_items]]
-        for group in _chunk(cards, 6):
-            rows.append({"cards": group})
-
-    # Mode 4: Vendor / keyword filter
-    elif q:
-        mapped_maker = MAKER_ALIASES.get(q)
-        if mapped_maker:
-            matched = [
-                m
-                for m in models
-                if str(m.get("maker") or "").lower() == mapped_maker
-                or mapped_maker in str(m.get("id") or "").lower()
-            ]
-            label = _theme_for(mapped_maker)["label"]
-            title = f"{label} 模型实时智商榜"
-        else:
-            matched = [
-                m
-                for m in models
-                if q in str(m.get("id") or "").lower()
-                or q in str(m.get("name") or "").lower()
-                or q in str(m.get("maker") or "").lower()
-            ]
-            title = f"搜索「{query.strip()}」模型智商榜"
-
-        matched.sort(
-            key=lambda m: float(
-                ((m.get("benchmarks") or {}).get("artificial_analysis") or {}).get(
-                    "intelligence"
-                )
-                or -1.0
-            ),
-            reverse=True,
-        )
-        cards = [_to_card(m) for m in matched[:max_ranking_items]]
-        for group in _chunk(cards, 6):
-            rows.append({"cards": group})
-
-    # Mode 5: Default multi-vendor grouped rows (mirrors reference screenshot)
-    else:
-        by_maker: dict[str, list[dict[str, Any]]] = {}
-        for m in models:
-            iq = ((m.get("benchmarks") or {}).get("artificial_analysis") or {}).get(
-                "intelligence"
-            )
-            if iq is None:
+        candidates: list[tuple[float, dict[str, Any]]] = []
+        for m in working:
+            iq = m.get("iq")
+            if not isinstance(iq, (int, float)) or iq < 20.0:
                 continue
-            maker = str(m.get("maker") or "").lower()
-            by_maker.setdefault(maker, []).append(m)
+            denom = m.get("cost_per_task")
+            if not isinstance(denom, (int, float)) or denom <= 0:
+                denom = _blended_price(m)
+            if denom is None or denom <= 0:
+                continue
+            candidates.append((float(iq) / float(denom), m))
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        cards = [
+            _to_card(m, score_key="iq", badge=f"#{i + 1}")
+            for i, (_, m) in enumerate(candidates[:max_ranking_items])
+        ]
+        rows = [{"cards": chunk} for chunk in _chunk(cards, per_row)]
+
+    elif is_free_mode:
+        title = "免费 AI 模型智商榜 ($0)"
+        subtitle = f"输入/输出均为 $0 的带跑分模型 · 按智商降序{effort_tag}{all_tag}"
+        free_models = [
+            m
+            for m in working
+            if isinstance(m.get("iq"), (int, float))
+            and (m.get("price_in") or 0) == 0
+            and (m.get("price_out") or 0) == 0
+            and (m.get("price_in") is not None or m.get("price_out") is not None)
+        ]
+        free_models.sort(key=lambda m: float(m["iq"]), reverse=True)
+        cards = [
+            _to_card(m, score_key="iq", badge=f"#{i + 1}")
+            for i, m in enumerate(free_models[:max_ranking_items])
+        ]
+        rows = [{"cards": chunk} for chunk in _chunk(cards, per_row)]
+
+    elif q_lower:
+        maker_target = MAKER_ALIASES.get(q_lower)
+        if maker_target:
+            matched = [
+                m
+                for m in working
+                if str(m.get("maker") or "").lower() == maker_target
+                and isinstance(m.get("iq"), (int, float))
+            ]
+            label = MAKER_THEMES.get(maker_target, {}).get("label", maker_target.upper())
+            title = f"{label} 实时智商与推理强度"
+            subtitle = (
+                f"每行同一模型按推理强度从高到低排列 · 右上单价/题均 · 右下速度 & 首答延迟"
+                f"{effort_tag}{all_tag}"
+            )
+            rows = _group_release_rows(
+                matched,
+                max_releases=None,
+                max_per_row=per_row,
+                score_key="iq",
+            )
+        else:
+            terms = [t for t in q_lower.split() if t]
+            matched = []
+            for m in working:
+                if not isinstance(m.get("iq"), (int, float)):
+                    continue
+                hay = (
+                    f"{m.get('id', '')} {m.get('release_slug', '')} "
+                    f"{m.get('release_name', '')} {m.get('name', '')} {m.get('maker', '')}"
+                ).lower()
+                if all(t in hay for t in terms):
+                    matched.append(m)
+            title = f"AI 模型搜索：{raw_q}"
+            subtitle = (
+                f"匹配在役模型按系列与推理强度分组 · 速度 & 首答延迟{effort_tag}{all_tag}"
+            )
+            rows = _group_release_rows(
+                matched,
+                max_releases=None,
+                max_per_row=per_row,
+                score_key="iq",
+            )
+    else:
+        # Default multi-vendor overview
+        by_maker: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for m in working:
+            if not isinstance(m.get("iq"), (int, float)):
+                continue
+            by_maker[str(m.get("maker") or "other").lower()].append(m)
 
         for maker in default_makers:
-            maker_key = maker.strip().lower()
-            if not maker_key or maker_key not in by_maker:
+            group = by_maker.get(maker)
+            if not group:
                 continue
-            group_models = sorted(
-                by_maker[maker_key],
-                key=lambda m: float(
-                    m["benchmarks"]["artificial_analysis"]["intelligence"]
-                ),
-                reverse=True,
-            )[:max_per_maker]
-            if group_models:
-                rows.append({"cards": [_to_card(m) for m in group_models]})
+            maker_rows = _group_release_rows(
+                group,
+                max_releases=max(1, max_releases_per_maker),
+                max_per_row=per_row,
+                score_key="iq",
+            )
+            rows.extend(maker_rows)
 
+    updated_str = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d %H:%M")
+    stale_note = "（上游暂不可用，当前为历史缓存）" if is_stale else ""
+    source_label = (
+        "Artificial Analysis 官方实时榜单"
+        if source == "artificial_analysis"
+        else "Artificial Analysis + OpenRouter (via modelgrep)"
+    )
     total_cards = sum(len(r["cards"]) for r in rows)
+
     return {
         "title": title,
         "subtitle": subtitle,
         "rows": rows,
-        "total_cards": total_cards,
         "updated_str": updated_str,
         "stale_note": stale_note,
+        "source_label": source_label,
+        "total_cards": total_cards,
     }
 
 
@@ -403,22 +737,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <style>
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
+    display: inline-block;
     background: #ffffff;
-    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    padding: 20px 22px 16px 22px;
-    width: 1320px;
+    padding: 18px 20px 14px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
     color: #1f2937;
+    -webkit-font-smoothing: antialiased;
   }
   .header {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
     margin-bottom: 14px;
     padding: 0 4px;
   }
@@ -429,13 +762,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     letter-spacing: 0.2px;
   }
   .subtitle {
-    font-size: 12px;
+    font-size: 11.5px;
     color: #6b7280;
   }
   .rows {
     display: flex;
     flex-direction: column;
-    gap: 11px;
+    gap: 10px;
   }
   .row {
     display: flex;
@@ -445,8 +778,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   }
   .card {
     position: relative;
-    width: 204px;
-    min-height: 78px;
+    width: 222px;
+    min-height: 84px;
     border-radius: 9px;
     border: 1.2px solid var(--border);
     background: var(--bg);
@@ -468,21 +801,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card-left {
     flex: 1;
     min-width: 0;
-    padding: 9px 8px 7px 10px;
+    padding: 9px 7px 7px 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
+  .name-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
   .model-name {
-    font-size: 12.5px;
-    line-height: 1.18;
+    font-size: 12px;
+    line-height: 1.15;
     font-weight: 600;
     color: var(--accent);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
     overflow: hidden;
-    word-break: break-word;
+    text-overflow: ellipsis;
   }
   .badge {
     font-size: 10px;
@@ -490,9 +826,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     opacity: 0.8;
     margin-right: 3px;
   }
+  .effort-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .effort-pill {
+    display: inline-block;
+    font-size: 10px;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent);
+    background: var(--pill-bg);
+  }
+  .effort-pill.effort-non-reasoning {
+    color: #6b7280;
+    background: #eceff3;
+    font-weight: 600;
+  }
   .score {
-    font-size: 29px;
-    line-height: 1.02;
+    font-size: 28px;
+    line-height: 1.0;
     font-weight: 500;
     color: #1f2937;
     letter-spacing: -0.6px;
@@ -500,10 +857,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-variant-numeric: tabular-nums;
   }
   .card-right {
-    width: 78px;
+    width: 90px;
     flex-shrink: 0;
     border-left: 1px solid var(--divider);
-    margin: 10px 0 8px 0;
+    margin: 9px 0 7px 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -511,14 +868,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .metric-top {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 0 4px 3px 4px;
-    font-size: 12.5px;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .price-main {
+    font-size: 12px;
     font-weight: 600;
     color: var(--accent);
     white-space: nowrap;
-    font-variant-numeric: tabular-nums;
+  }
+  .price-sub {
+    font-size: 9.5px;
+    font-weight: 500;
+    color: #7c8798;
+    margin-top: 1px;
+    white-space: nowrap;
   }
   .metric-bottom {
     flex: 1;
@@ -526,11 +894,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     align-items: center;
     justify-content: center;
     border-top: 1px solid var(--divider);
-    margin: 0 6px;
+    margin: 0 5px;
     padding: 3px 0 0 0;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 500;
-    color: #556070;
+    color: #4b5563;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
@@ -539,6 +907,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     padding: 0 4px;
     display: flex;
     justify-content: space-between;
+    gap: 16px;
     font-size: 11px;
     color: #9ca3af;
   }
@@ -553,13 +922,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     {% for row in rows %}
     <div class="row">
       {% for card in row.cards %}
-      <div class="card" style="--accent: {{ card.accent }}; --border: {{ card.border }}; --bg: {{ card.bg }}; --divider: {{ card.divider }};">
+      <div class="card" style="--accent: {{ card.accent }}; --border: {{ card.border }}; --bg: {{ card.bg }}; --divider: {{ card.divider }}; --pill-bg: {{ card.pill_bg }};">
         <div class="card-left">
-          <div class="model-name">{% if card.badge %}<span class="badge">{{ card.badge }}</span>{% endif %}{{ card.name }}</div>
+          <div class="name-block">
+            <div class="model-name">{% if card.badge %}<span class="badge">{{ card.badge }}</span>{% endif %}{{ card.name }}</div>
+            {% if card.effort %}<div class="effort-row"><span class="effort-pill effort-{{ card.effort_key }}">{{ card.effort }}</span></div>{% endif %}
+          </div>
           <div class="score">{{ card.score }}</div>
         </div>
         <div class="card-right">
-          <div class="metric-top">{{ card.price }}</div>
+          <div class="metric-top">
+            <span class="price-main">{{ card.price }}</span>
+            {% if card.task_cost %}<span class="price-sub">{{ card.task_cost }}</span>{% endif %}
+          </div>
           <div class="metric-bottom">{{ card.perf }}</div>
         </div>
       </div>
@@ -568,7 +943,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     {% endfor %}
   </div>
   <div class="footer">
-    <span>数据来源：Artificial Analysis + OpenRouter (via modelgrep) · 共展示 {{ total_cards }} 个模型</span>
+    <span>数据来源：{{ source_label }} · 共展示 {{ total_cards }} 个配置</span>
     <span>更新于 {{ updated_str }}{{ stale_note }}</span>
   </div>
 </body>
@@ -584,9 +959,13 @@ def format_text_fallback(view_data: dict[str, Any]) -> str:
             continue
         for c in row["cards"]:
             prefix = f"{c['badge']} " if c["badge"] else ""
+            ef = f" [{c['effort']}]" if c["effort"] else ""
+            tc = f" ({c['task_cost']})" if c["task_cost"] else ""
             lines.append(
-                f"- {prefix}{c['name']} | 评分: {c['score']} | 价格: {c['price']} | 速度/延迟: {c['perf']}"
+                f"- {prefix}{c['name']}{ef} | 评分: {c['score']} | 价格: {c['price']}{tc} | 速度/延迟: {c['perf']}"
             )
     lines.append("")
-    lines.append(f"更新于 {view_data['updated_str']}{view_data['stale_note']}")
+    lines.append(
+        f"数据来源：{view_data['source_label']} · 更新于 {view_data['updated_str']}{view_data['stale_note']}"
+    )
     return "\n".join(lines)
