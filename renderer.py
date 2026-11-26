@@ -1,113 +1,111 @@
 from __future__ import annotations
 
+import colorsys
+import hashlib
 import re
 import time
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
 
-# Theme palette per vendor: accent, border, soft_bg, pill_bg
-MAKER_THEMES: dict[str, dict[str, str]] = {
-    "anthropic": {
-        "label": "Anthropic · Claude",
-        "accent": "#cf4642",
-        "border": "#ebb0ad",
-        "bg": "#fff7f6",
-        "pill_bg": "#fde5e3",
-    },
-    "openai": {
-        "label": "OpenAI · GPT",
-        "accent": "#b87a14",
-        "border": "#e6c687",
-        "bg": "#fffbf2",
-        "pill_bg": "#fdf0d5",
-    },
-    "google": {
-        "label": "Google · Gemini",
-        "accent": "#2567bd",
-        "border": "#9cc1f0",
-        "bg": "#f4f9ff",
-        "pill_bg": "#e0edfe",
-    },
-    "deepseek": {
-        "label": "DeepSeek",
-        "accent": "#0e8a70",
-        "border": "#88d4c3",
-        "bg": "#f2fcf9",
-        "pill_bg": "#daf5ee",
-    },
-    "qwen": {
-        "label": "Alibaba · Qwen",
-        "accent": "#6845c9",
-        "border": "#bcacee",
-        "bg": "#f8f6ff",
-        "pill_bg": "#eae3fc",
-    },
-    "z-ai": {
-        "label": "Z.ai · GLM",
-        "accent": "#3e58c9",
-        "border": "#a4b4ee",
-        "bg": "#f4f7ff",
-        "pill_bg": "#e2e8fd",
-    },
-    "moonshotai": {
-        "label": "Moonshot · Kimi",
-        "accent": "#b5387d",
-        "border": "#e3a1c5",
-        "bg": "#fff5fa",
-        "pill_bg": "#fbe2f0",
-    },
-    "x-ai": {
-        "label": "xAI · Grok",
-        "accent": "#475569",
-        "border": "#aebac9",
-        "bg": "#f7f9fb",
-        "pill_bg": "#e6ebf1",
-    },
-    "meta": {
-        "label": "Meta",
-        "accent": "#2563c9",
-        "border": "#9cbcf0",
-        "bg": "#f4f8ff",
-        "pill_bg": "#e0ecfe",
-    },
-    "mistralai": {
-        "label": "Mistral",
-        "accent": "#cc5f1d",
-        "border": "#ebb492",
-        "bg": "#fff8f4",
-        "pill_bg": "#fde9dc",
-    },
-    "minimax": {
-        "label": "MiniMax",
-        "accent": "#be405d",
-        "border": "#e6a3b3",
-        "bg": "#fff6f8",
-        "pill_bg": "#fbe3e8",
-    },
-    "tencent": {
-        "label": "Tencent · Hunyuan",
-        "accent": "#1d75bc",
-        "border": "#94c4ea",
-        "bg": "#f3faff",
-        "pill_bg": "#deeffc",
-    },
-    "xiaomi": {
-        "label": "Xiaomi · MiMo",
-        "accent": "#c95d16",
-        "border": "#ebb38c",
-        "bg": "#fff8f2",
-        "pill_bg": "#fde9da",
-    },
+_HEX_COLOR_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    h = hex_color.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return f"#{max(0, min(255, r)):02x}{max(0, min(255, g)):02x}{max(0, min(255, b)):02x}"
+
+
+def _mix_hex(hex_a: str, hex_b: str, weight_a: float) -> str:
+    r1, g1, b1 = _hex_to_rgb(hex_a)
+    r2, g2, b2 = _hex_to_rgb(hex_b)
+    w = max(0.0, min(1.0, weight_a))
+    return _rgb_to_hex(
+        round(r1 * w + r2 * (1.0 - w)),
+        round(g1 * w + g2 * (1.0 - w)),
+        round(b1 * w + b2 * (1.0 - w)),
+    )
+
+
+def _normalize_brand_hex(raw_hex: str | None) -> str | None:
+    """Clamp an upstream brand hex into a readable lightness range on white backgrounds."""
+    if not raw_hex:
+        return None
+    m = _HEX_COLOR_RE.match(raw_hex.strip())
+    if not m:
+        return None
+    r, g, b = _hex_to_rgb(m.group(1))
+    h, l, s = colorsys.rgb_to_hls(r / 255.0, g / 255.0, b / 255.0)
+    # Prevent pitch-black or washed-out pastel/neon brand colors from losing legibility
+    l = max(0.32, min(0.48, l))
+    if s > 0.12:
+        s = max(0.42, min(0.78, s))
+    nr, ng, nb = colorsys.hls_to_rgb(h, l, s)
+    return _rgb_to_hex(round(nr * 255), round(ng * 255), round(nb * 255))
+
+
+def _derive_palette(accent: str, label: str) -> dict[str, str]:
+    """Derive a full progressive fade-to-gray palette from a single vendor brand accent."""
+    return {
+        "label": label,
+        "accent": accent,
+        "accent_deep": _mix_hex(accent, "#0f172a", 0.84),
+        "accent_xhigh": _mix_hex(accent, "#64748b", 0.76),
+        "border": _mix_hex(accent, "#ffffff", 0.45),
+        "border_soft": _mix_hex(accent, "#cbd5e1", 0.28),
+        "bg": _mix_hex(accent, "#ffffff", 0.075),
+        "bg_soft": _mix_hex(accent, "#f8fafc", 0.04),
+        "pill_bg": _mix_hex(accent, "#ffffff", 0.15),
+        "bar_high": _mix_hex(accent, "#94a3b8", 0.70),
+        "bar_med": _mix_hex(accent, "#94a3b8", 0.34),
+    }
+
+
+# Authentic, conflict-free vendor brand accents (Claude red, OpenAI green, Google blue,
+# DeepSeek whale indigo-blue, Qwen violet, GLM teal-blue, Kimi magenta, Grok slate, etc.)
+MAKER_BRAND_ACCENTS: dict[str, tuple[str, str]] = {
+    "anthropic": ("Anthropic · Claude", "#cf4a3a"),
+    "openai": ("OpenAI · GPT", "#0f9d78"),
+    "google": ("Google · Gemini", "#1a73e8"),
+    "deepseek": ("DeepSeek", "#3b5bdb"),
+    "qwen": ("Alibaba · Qwen", "#7c3aed"),
+    "z-ai": ("Z.ai · GLM", "#0e8599"),
+    "moonshotai": ("Moonshot · Kimi", "#be347b"),
+    "x-ai": ("xAI · Grok", "#334155"),
+    "meta": ("Meta · Muse", "#0668e1"),
+    "mistralai": ("Mistral", "#e05a1b"),
+    "minimax": ("MiniMax", "#d43f60"),
+    "tencent": ("Tencent · Hunyuan", "#0077d9"),
+    "xiaomi": ("Xiaomi · MiMo", "#e65c19"),
 }
 
-DEFAULT_THEME: dict[str, str] = {
-    "label": "Other",
-    "accent": "#475569",
-    "border": "#cbd5e1",
-    "bg": "#f8fafc",
-    "pill_bg": "#e8edf3",
+MAKER_THEMES: dict[str, dict[str, str]] = {
+    maker: _derive_palette(accent, label)
+    for maker, (label, accent) in MAKER_BRAND_ACCENTS.items()
 }
+
+DEFAULT_THEME: dict[str, str] = _derive_palette("#475569", "Other")
+
+
+def _resolve_maker_theme(
+    maker: str, creator_color: str | None = None
+) -> dict[str, str]:
+    """Return vendor theme: curated brand color -> clamped AA creator color -> deterministic hue."""
+    key = (maker or "other").strip().lower()
+    if key in MAKER_THEMES:
+        return MAKER_THEMES[key]
+    label = key.replace("-", " ").title() if key else "Other"
+    clamped = _normalize_brand_hex(creator_color)
+    if clamped:
+        return _derive_palette(clamped, label)
+    digest = int(hashlib.md5(key.encode("utf-8")).hexdigest()[:6], 16)
+    hue = (digest % 360) / 360.0
+    r, g, b = colorsys.hls_to_rgb(hue, 0.43, 0.58)
+    return _derive_palette(_rgb_to_hex(round(r * 255), round(g * 255), round(b * 255)), label)
 
 MAKER_ALIASES: dict[str, str] = {
     "gpt": "openai",
@@ -445,6 +443,21 @@ def _to_effort_tile(m: dict[str, Any], *, score_key: str, max_score: float) -> d
     }
 
 
+def _theme_css_vars(theme: dict[str, str]) -> str:
+    return (
+        f"--accent: {theme['accent']}; "
+        f"--accent-deep: {theme['accent_deep']}; "
+        f"--accent-xhigh: {theme['accent_xhigh']}; "
+        f"--border: {theme['border']}; "
+        f"--border-soft: {theme['border_soft']}; "
+        f"--bg: {theme['bg']}; "
+        f"--bg-soft: {theme['bg_soft']}; "
+        f"--pill_bg: {theme['pill_bg']}; "
+        f"--bar-high: {theme['bar_high']}; "
+        f"--bar-med: {theme['bar_med']};"
+    )
+
+
 def _to_ranking_card(
     m: dict[str, Any],
     *,
@@ -453,7 +466,7 @@ def _to_ranking_card(
     badge: str = "",
 ) -> dict[str, Any]:
     maker = str(m.get("maker") or "other").lower()
-    theme = MAKER_THEMES.get(maker, DEFAULT_THEME)
+    theme = _resolve_maker_theme(maker, m.get("creator_color"))
     val = m.get(score_key)
     score_str = f"{float(val):.1f}" if isinstance(val, (int, float)) else "--"
     effort_key = str(m.get("effort") or "").lower()
@@ -473,6 +486,7 @@ def _to_ranking_card(
         "border": theme["border"],
         "bg": theme["bg"],
         "pill_bg": theme["pill_bg"],
+        "css_vars": _theme_css_vars(theme),
     }
 
 
@@ -502,7 +516,10 @@ def _build_vendor_section(
     if not sorted_rels:
         return None
 
-    theme = MAKER_THEMES.get(maker, DEFAULT_THEME)
+    creator_color = next(
+        (m.get("creator_color") for m in items if m.get("creator_color")), None
+    )
+    theme = _resolve_maker_theme(maker, creator_color)
     model_rows: list[dict[str, Any]] = []
     for grp in sorted_rels:
         grp_sorted = sorted(grp, key=_effort_sort_key)
@@ -522,11 +539,12 @@ def _build_vendor_section(
 
     return {
         "maker": maker,
-        "label": theme["label"] if maker in MAKER_THEMES else maker.upper(),
+        "label": theme["label"],
         "accent": theme["accent"],
         "border": theme["border"],
         "bg": theme["bg"],
         "pill_bg": theme["pill_bg"],
+        "css_vars": _theme_css_vars(theme),
         "models": model_rows,
         "tile_count": sum(len(r["efforts"]) for r in model_rows),
     }
@@ -965,9 +983,30 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     justify-content: space-between;
     gap: 5px;
   }
-  .tile.tier-strong {
+  .tile.tier-extreme,
+  .tile.tier-ultra,
+  .tile.tier-max {
     background: var(--bg);
     border-color: var(--border);
+  }
+  .tile.tier-xhigh {
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .tile.tier-high,
+  .tile.tier-reasoning {
+    background: var(--bg-soft);
+    border-color: var(--border-soft);
+  }
+  .tile.tier-medium {
+    background: #f8fafc;
+    border-color: #dce3ec;
+  }
+  .tile.tier-low,
+  .tile.tier-minimal,
+  .tile.tier-non-reasoning {
+    background: #f8fafc;
+    border-color: #e6ecf2;
   }
   .tile-top {
     display: flex;
@@ -990,29 +1029,51 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     background: var(--pill_bg);
     border: 1px solid var(--border);
   }
+  /* Progressive fade-to-gray scale: extreme/ultra -> max -> xhigh -> high -> medium -> low -> non-reasoning */
   .effort-pill.effort-extreme,
-  .effort-pill.effort-ultra,
-  .effort-pill.effort-max,
-  .effort-pill.effort-xhigh {
+  .effort-pill.effort-ultra {
+    background: var(--accent-deep);
+    color: #ffffff;
+    border-color: var(--accent-deep);
+  }
+  .effort-pill.effort-max {
     background: var(--accent);
     color: #ffffff;
     border-color: var(--accent);
   }
-  .effort-pill.effort-medium,
-  .effort-pill.effort-low,
-  .effort-pill.effort-minimal {
-    background: #ffffff;
+  .effort-pill.effort-xhigh {
+    background: var(--accent-xhigh);
+    color: #ffffff;
+    border-color: var(--accent-xhigh);
+  }
+  .effort-pill.effort-high {
+    background: var(--pill_bg);
     color: var(--accent);
     border-color: var(--border);
-    font-weight: 700;
   }
   .effort-pill.effort-reasoning {
+    background: var(--pill_bg);
+    color: var(--accent);
+    border-color: var(--border);
     text-transform: none;
   }
-  .effort-pill.effort-non-reasoning {
-    background: #e2e8f0;
-    color: #334155;
+  .effort-pill.effort-medium {
+    background: #e9eef4;
+    color: #475569;
     border-color: #cbd5e1;
+    font-weight: 700;
+  }
+  .effort-pill.effort-low,
+  .effort-pill.effort-minimal {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #dde4ec;
+    font-weight: 700;
+  }
+  .effort-pill.effort-non-reasoning {
+    background: #f4f6f9;
+    color: #94a3b8;
+    border-color: #e2e8f0;
     font-weight: 700;
     text-transform: none;
   }
@@ -1048,6 +1109,22 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     height: 100%;
     border-radius: 999px;
     background: var(--accent);
+  }
+  .tile.tier-xhigh .bar-fill {
+    background: var(--accent-xhigh);
+  }
+  .tile.tier-high .bar-fill {
+    background: var(--bar-high);
+  }
+  .tile.tier-medium .bar-fill {
+    background: var(--bar-med);
+  }
+  .tile.tier-low .bar-fill,
+  .tile.tier-minimal .bar-fill {
+    background: #94a3b8;
+  }
+  .tile.tier-non-reasoning .bar-fill {
+    background: #cbd5e1;
   }
   .tile-perf {
     font-size: 12px;
@@ -1178,7 +1255,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   {% if layout == 'matrix' %}
   <div class="sections">
     {% for sec in sections %}
-    <div class="vendor-card" style="--accent: {{ sec.accent }}; --border: {{ sec.border }}; --bg: {{ sec.bg }}; --pill_bg: {{ sec.pill_bg }};">
+    <div class="vendor-card" style="{{ sec.css_vars }}">
       <div class="vendor-header">
         <div class="vendor-title"><span class="vendor-dot"></span>{{ sec.label }}</div>
         <div class="vendor-meta">{{ sec.models | length }} 个系列 · {{ sec.tile_count }} 个档位</div>
@@ -1194,7 +1271,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
         <div class="effort-grid">
           {% for t in model.efforts %}
-          <div class="tile{% if t.effort_key in ['extreme', 'ultra', 'max', 'xhigh', 'high'] %} tier-strong{% endif %}">
+          <div class="tile tier-{{ t.effort_key }}">
             <div class="tile-top">
               {% if t.effort %}<span class="effort-pill effort-{{ t.effort_key }}">{{ t.effort }}</span>{% endif %}
               {% if t.task_cost %}<span class="task-cost">{{ t.task_cost }}</span>{% endif %}
@@ -1215,7 +1292,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   {% else %}
   <div class="rank-grid">
     {% for c in ranking_cards %}
-    <div class="rank-card" style="--accent: {{ c.accent }}; --border: {{ c.border }}; --bg: {{ c.bg }}; --pill_bg: {{ c.pill_bg }};">
+    <div class="rank-card" style="{{ c.css_vars }}">
       <div class="rank-top">
         <div class="rank-name-wrap">
           {% if c.badge %}<span class="rank-badge">{{ c.badge }}</span>{% endif %}

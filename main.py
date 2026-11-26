@@ -77,13 +77,48 @@ class AIIQPlugin(Star):
         return Path(__file__).resolve().parent / "data"
 
     def _get_default_makers(self) -> list[str]:
-        raw = str(
-            self.config.get(
-                "default_makers",
-                "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
+        makers: list[str] = []
+        seen: set[str] = set()
+
+        def _add(item: str) -> None:
+            key = item.strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                makers.append(key)
+
+        selected = self.config.get("selected_makers")
+        if isinstance(selected, list):
+            for item in selected:
+                _add(str(item))
+        elif isinstance(selected, str) and selected.strip():
+            for part in _TRIGGER_SPLIT_RE.split(selected):
+                _add(part)
+        else:
+            # Backwards compatibility with older default_makers string config
+            legacy = str(
+                self.config.get(
+                    "default_makers",
+                    "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
+                )
             )
-        )
-        return [item.strip().lower() for item in raw.split(",") if item.strip()]
+            for part in _TRIGGER_SPLIT_RE.split(legacy):
+                _add(part)
+
+        custom = str(self.config.get("custom_makers", "") or "")
+        if custom.strip():
+            for part in _TRIGGER_SPLIT_RE.split(custom):
+                _add(part)
+
+        return makers or [
+            "anthropic",
+            "openai",
+            "google",
+            "deepseek",
+            "qwen",
+            "z-ai",
+            "moonshotai",
+            "x-ai",
+        ]
 
     def _get_trigger_keywords(self) -> tuple[str, ...]:
         raw = str(self.config.get("trigger_keywords", "aiiq") or "aiiq")

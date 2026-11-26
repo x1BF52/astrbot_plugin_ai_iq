@@ -10,19 +10,69 @@
     "type": "string",
     "default": "auto",
     "options": ["auto", "artificial_analysis", "llmpricing", "benchgecko", "modelgrep"],
+    "labels": [
+      "自动（推荐：AA 主源 + 高速回退）",
+      "Artificial Analysis（完整推理强度）",
+      "LLM Pricing（AA v5 + 官方定价）",
+      "BenchGecko（多榜硬核综合分）",
+      "modelgrep（OpenRouter + AA）"
+    ],
     "hint": "auto：优先 Artificial Analysis（含完整推理强度分档与题均成本），不可达时临时回退 llmpricing.dev → modelgrep（不污染缓存）"
   },
   "aa_api_key": {
     "description": "Artificial Analysis 官方 API Key（可选）",
     "type": "string",
     "default": "",
+    "secret": true,
     "hint": "留空则自动拉取 AA 公开榜单；填写后优先通过官方 v2 API 拉取（https://artificialanalysis.ai/api/v2/data/llms/models，免费档 1000 次/天）"
   },
   "custom_api_url": {
     "description": "自定义数据源 API 地址（可选）",
     "type": "string",
     "default": "",
-    "hint": "留空使用内置数据源；填写后优先请求该地址，自动兼容 AA 官方 JSON / AA 榜单反代 / modelgrep JSON"
+    "hint": "留空使用内置数据源；填写后优先请求该地址，自动兼容 AA 官方 JSON / AA 榜单反代 / llmpricing / BenchGecko / modelgrep"
+  },
+  "selected_makers": {
+    "description": "默认展示的厂商（多选）",
+    "type": "list",
+    "default": ["anthropic", "openai", "google", "deepseek", "qwen", "z-ai", "moonshotai", "x-ai"],
+    "options": [
+      "anthropic",
+      "openai",
+      "google",
+      "deepseek",
+      "qwen",
+      "z-ai",
+      "moonshotai",
+      "x-ai",
+      "meta",
+      "minimax",
+      "tencent",
+      "xiaomi",
+      "mistralai"
+    ],
+    "labels": [
+      "Anthropic · Claude",
+      "OpenAI · GPT",
+      "Google · Gemini",
+      "DeepSeek",
+      "Alibaba · Qwen",
+      "Z.ai · GLM",
+      "Moonshot · Kimi",
+      "xAI · Grok",
+      "Meta · Muse",
+      "MiniMax",
+      "Tencent · Hunyuan",
+      "Xiaomi · MiMo",
+      "Mistral"
+    ],
+    "hint": "勾选在默认总览中展示的主流厂商，按选择顺序分段展示"
+  },
+  "custom_makers": {
+    "description": "自定义追加厂商（逗号分隔，可选）",
+    "type": "string",
+    "default": "",
+    "hint": "如需展示上方列表之外的新厂商（例如 stepfun,nvidia,cohere,thinkingmachines），在此填写厂商标识，将追加在勾选厂商之后"
   },
   "hide_non_reasoning": {
     "description": "隐藏「无推理」档位",
@@ -42,12 +92,6 @@
     "default": 180,
     "hint": "仅在开启「自动过滤过期模型」时生效，超过该发布天数的旧模型将被隐藏（默认 180 天，填 0 不按时间过滤）"
   },
-  "default_makers": {
-    "description": "默认展示的厂商列表（逗号分隔）",
-    "type": "string",
-    "default": "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
-    "hint": "按填写顺序分行展示。可选：anthropic, openai, google, deepseek, qwen, z-ai, moonshotai, x-ai, meta, mistralai, minimax, tencent, xiaomi"
-  },
   "max_series_per_maker": {
     "description": "默认总览每个厂商最多展示的系列行数",
     "type": "int",
@@ -61,7 +105,7 @@
     "hint": "建议 5~6 个，与每行卡片宽度最协调"
   },
   "max_ranking_items": {
-    "description": "榜单模式（编程/性价比/免费/搜索）最多展示卡片数",
+    "description": "榜单模式（编程/性价比/硬核/免费/搜索）最多展示卡片数",
     "type": "int",
     "default": 24,
     "hint": "控制单张图片高度，建议 18~30"

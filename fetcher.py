@@ -207,6 +207,7 @@ def parse_aa_leaderboard_html(html: str) -> list[dict[str, Any]]:
                 "effort": effort,
                 "effort_label": effort_label,
                 "maker": maker,
+                "creator_color": item.get("modelCreatorColor"),
                 "release_date": release_date,
                 "created_ts": _parse_iso_date_ts(release_date),
                 "deprecated": deprecated,
