@@ -55,7 +55,9 @@ class ModelDataFetcher:
                 "User-Agent": "AstrBot-Plugin-AI-IQ/1.0 (+https://github.com/x1BF52/astrbot_plugin_ai_iq)",
                 "Accept": "application/json",
             }
-            self._session = aiohttp.ClientSession(timeout=timeout, headers=headers)
+            self._session = aiohttp.ClientSession(
+                timeout=timeout, headers=headers, trust_env=True
+            )
         return self._session
 
     async def close(self) -> None:

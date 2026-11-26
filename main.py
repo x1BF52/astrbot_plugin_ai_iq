@@ -1,10 +1,9 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
+from astrbot.core.star.filter.command import GreedyStr
 
 try:
     from astrbot.api.star import StarTools
@@ -26,9 +25,9 @@ HELP_TEXT = """AI 模型实时智商榜 - 使用说明
 
 
 class AIIQPlugin(Star):
-    def __init__(self, context: Context, config: AstrBotConfig | None = None):
+    def __init__(self, context: Context, config: AstrBotConfig | dict | None = None):
         super().__init__(context)
-        self.config = config or {}
+        self.config = config if config is not None else {}
         cache_dir = self._resolve_data_dir()
         ttl_minutes = int(self.config.get("cache_ttl_minutes", 15))
         timeout_seconds = int(self.config.get("request_timeout", 20))
@@ -39,6 +38,7 @@ class AIIQPlugin(Star):
             timeout_seconds=timeout_seconds,
             proxy=proxy,
         )
+        logger.info(f"[ai_iq] 插件已加载，缓存目录: {cache_dir}")
 
     def _resolve_data_dir(self) -> Path:
         if StarTools is not None:
@@ -57,12 +57,11 @@ class AIIQPlugin(Star):
         )
         return [item.strip().lower() for item in raw.split(",") if item.strip()]
 
-    @filter.command("aiiq", alias={"iq", "模型智商"})
-    async def cmd_aiiq(self, event: AstrMessageEvent):
+    @filter.command("aiiq", alias={"模型智商"})
+    async def cmd_aiiq(self, event: AstrMessageEvent, query: GreedyStr = ""):
         """查询全球主流 AI 模型实时智商、价格与速度延迟"""
-        raw_msg = event.message_str.strip()
-        parts = raw_msg.split(maxsplit=1)
-        arg = parts[1].strip() if len(parts) > 1 else ""
+        arg = str(query or "").strip()
+        logger.info(f"[ai_iq] 收到查询: {arg!r}")
 
         if arg.lower() in {"help", "帮助", "-h", "?"}:
             yield event.plain_result(HELP_TEXT)

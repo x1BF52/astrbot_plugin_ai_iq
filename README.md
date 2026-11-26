@@ -1,4 +1,4 @@
-# astrbot_plugin_ai_iq
+﻿# astrbot_plugin_ai_iq
 
 AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模型（**GPT / Gemini / Claude / DeepSeek / Qwen / GLM / Kimi / Grok** 等 20+ 厂商、150+ 模型）的实时智商评分、API 价格、输出速度与首字延迟，并以分组配色卡片图直观呈现，方便快速选模型干活。
 
@@ -13,7 +13,7 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 
 | 指令 | 说明 |
 | --- | --- |
-| `/aiiq` | 查看主流厂商 Top 模型分组卡片图（别名 `/iq`、`/模型智商`） |
+| `/aiiq` | 查看主流厂商 Top 模型分组卡片图（别名 `/模型智商`） |
 | `/aiiq gemini` / `/aiiq deepseek` / `/aiiq gpt` / `/aiiq claude` | 按厂商或模型名关键词筛选 |
 | `/aiiq 编程` | 按 Artificial Analysis 编程跑分（Coding）降序排行 |
 | `/aiiq 性价比` | 按「智商 ÷ 综合单价」排序，挑选最划算的干活模型 |
