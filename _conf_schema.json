@@ -1,0 +1,38 @@
+{
+  "cache_ttl_minutes": {
+    "description": "数据缓存时间（分钟）",
+    "type": "int",
+    "default": 15,
+    "hint": "在此时间内重复查询直接复用本地缓存，避免频繁请求上游 API"
+  },
+  "default_makers": {
+    "description": "默认展示的厂商列表（逗号分隔）",
+    "type": "string",
+    "default": "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
+    "hint": "按填写顺序分行展示。可选：anthropic, openai, google, deepseek, qwen, z-ai, moonshotai, x-ai, meta, mistralai, minimax, tencent, xiaomi"
+  },
+  "max_per_maker": {
+    "description": "默认视图每个厂商最多展示的模型数量",
+    "type": "int",
+    "default": 6,
+    "hint": "建议 4~6 个，与每行卡片宽度最协调"
+  },
+  "max_ranking_items": {
+    "description": "榜单模式（编程/性价比/免费/搜索）最多展示卡片数",
+    "type": "int",
+    "default": 24,
+    "hint": "控制单张图片高度，建议 18~30"
+  },
+  "request_timeout": {
+    "description": "API 请求超时时间（秒）",
+    "type": "int",
+    "default": 20,
+    "hint": "网络较慢时可适当调大"
+  },
+  "proxy": {
+    "description": "HTTP 代理地址（可选）",
+    "type": "string",
+    "default": "",
+    "hint": "留空直连；如需代理可填写例如 http://127.0.0.1:7890"
+  }
+}
