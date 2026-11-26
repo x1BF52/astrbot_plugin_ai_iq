@@ -11,12 +11,7 @@ from typing import Any
 
 import aiohttp
 
-try:
-    from astrbot.api import logger
-except ImportError:  # pragma: no cover - local test fallback
-    import logging
-
-    logger = logging.getLogger("astrbot_plugin_ai_iq")
+from astrbot.api import logger
 
 
 AA_LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models"
