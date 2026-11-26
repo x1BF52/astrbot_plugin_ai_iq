@@ -16,6 +16,8 @@ from astrbot.api import logger
 
 AA_LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models"
 AA_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+LLMPRICING_API_URL = "https://llmpricing.dev/api/models.json"
+BENCHGECKO_API_URL = "https://benchgecko.ai/api/v1/models"
 MODELGREP_API_URL = "https://modelgrep.com/api/v1/models"
 
 CACHE_SCHEMA_VERSION = 3
@@ -32,16 +34,23 @@ _AA_CREATOR_MAP: dict[str, str] = {
     "qwen": "qwen",
     "z ai": "z-ai",
     "z.ai": "z-ai",
+    "z-ai": "z-ai",
+    "zai": "z-ai",
     "zhipu": "z-ai",
+    "zhipuai": "z-ai",
     "kimi": "moonshotai",
+    "moonshot": "moonshotai",
     "moonshot ai": "moonshotai",
     "moonshotai": "moonshotai",
     "xai": "x-ai",
+    "x-ai": "x-ai",
     "spacexai": "x-ai",
     "spacexsi": "x-ai",
     "meta": "meta",
+    "meta-llama": "meta",
     "mistral": "mistralai",
     "mistral ai": "mistralai",
+    "mistralai": "mistralai",
     "minimax": "minimax",
     "tencent": "tencent",
     "xiaomi": "xiaomi",
@@ -419,6 +428,131 @@ def normalize_aa_api_models(raw_models: list[dict[str, Any]]) -> list[dict[str, 
     return normalized
 
 
+def normalize_llmpricing_models(raw_models: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize llmpricing.dev/api/models.json records into the unified schema."""
+    normalized: list[dict[str, Any]] = []
+    for item in raw_models:
+        if not isinstance(item, dict):
+            continue
+        aa = item.get("aa") if isinstance(item.get("aa"), dict) else None
+        if not aa:
+            continue
+
+        iq = aa.get("idx")
+        coding = aa.get("coding")
+        evals = aa.get("evals") if isinstance(aa.get("evals"), dict) else {}
+        if coding is None and evals:
+            fc2 = evals.get("frontiercode-2-0")
+            tb = evals.get("terminalbench-4-1") or evals.get("terminalbench-4-0")
+            c_vals = [float(v) for v in (fc2, tb) if isinstance(v, (int, float))]
+            if c_vals:
+                coding = round(sum(c_vals) / len(c_vals) * 100.0, 2)
+
+        if iq is None and coding is None:
+            continue
+
+        mid = str(item.get("id") or "").strip()
+        raw_name = str(item.get("name") or mid).strip()
+        rel_slug = mid.split("/", 1)[-1] if "/" in mid else mid
+        lab = item.get("lab") or (mid.split("/", 1)[0] if "/" in mid else "")
+        maker = _normalize_aa_creator(lab)
+
+        caps = item.get("capabilities") if isinstance(item.get("capabilities"), dict) else {}
+        is_reasoning = caps.get("reasoning")
+        effort, effort_label = normalize_effort(None, is_reasoning)
+
+        price_obj = (
+            item.get("official")
+            or item.get("reference")
+            or item.get("cheapest")
+            or {}
+        )
+        if not isinstance(price_obj, dict):
+            price_obj = {}
+        pin = price_obj.get("input")
+        pout = price_obj.get("output")
+
+        release_date = item.get("releaseDate")
+        normalized.append(
+            {
+                "id": mid or rel_slug,
+                "release_slug": rel_slug,
+                "release_name": raw_name,
+                "name": raw_name,
+                "effort": effort,
+                "effort_label": effort_label,
+                "maker": maker,
+                "release_date": release_date,
+                "created_ts": _parse_iso_date_ts(release_date),
+                "deprecated": str(item.get("status") or "").lower() == "deprecated",
+                "is_reasoning": bool(is_reasoning),
+                "iq": float(iq) if isinstance(iq, (int, float)) else None,
+                "coding": float(coding) if isinstance(coding, (int, float)) else None,
+                "price_in": float(pin) if isinstance(pin, (int, float)) else None,
+                "price_out": float(pout) if isinstance(pout, (int, float)) else None,
+                "cost_per_task": float(aa["taskCost"])
+                if isinstance(aa.get("taskCost"), (int, float))
+                else None,
+                "time_per_task": None,
+                "tps": float(aa["speed"])
+                if isinstance(aa.get("speed"), (int, float))
+                else None,
+                "latency_s": float(aa["ttft"])
+                if isinstance(aa.get("ttft"), (int, float))
+                else None,
+                "source": "llmpricing",
+            }
+        )
+    return normalized
+
+
+def normalize_benchgecko_models(raw_models: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize benchgecko.ai/api/v1/models multi-benchmark records into the unified schema."""
+    normalized: list[dict[str, Any]] = []
+    for item in raw_models:
+        if not isinstance(item, dict):
+            continue
+        avg_score = item.get("avg_score")
+        scores = item.get("scores") if isinstance(item.get("scores"), dict) else {}
+        coding = scores.get("frontierswe")
+        if avg_score is None and coding is None:
+            continue
+
+        slug = str(item.get("slug") or "").strip()
+        raw_name = str(item.get("name") or slug).strip()
+        maker = _normalize_aa_creator(item.get("provider_slug") or item.get("provider"))
+        pricing = item.get("pricing") if isinstance(item.get("pricing"), dict) else {}
+        pin = pricing.get("input")
+        pout = pricing.get("output")
+        release_date = item.get("release_date")
+
+        normalized.append(
+            {
+                "id": slug or raw_name,
+                "release_slug": slug or raw_name.lower(),
+                "release_name": raw_name,
+                "name": raw_name,
+                "effort": "",
+                "effort_label": "",
+                "maker": maker,
+                "release_date": release_date,
+                "created_ts": _parse_iso_date_ts(release_date),
+                "deprecated": False,
+                "is_reasoning": True,
+                "iq": float(avg_score) if isinstance(avg_score, (int, float)) else None,
+                "coding": float(coding) if isinstance(coding, (int, float)) else None,
+                "price_in": float(pin) if isinstance(pin, (int, float)) else None,
+                "price_out": float(pout) if isinstance(pout, (int, float)) else None,
+                "cost_per_task": None,
+                "time_per_task": None,
+                "tps": None,
+                "latency_s": None,
+                "source": "benchgecko",
+            }
+        )
+    return normalized
+
+
 def parse_custom_api_response(text: str) -> list[dict[str, Any]]:
     """Auto-detect and parse response from a custom API / reverse proxy URL."""
     stripped = text.lstrip()
@@ -439,6 +573,12 @@ def parse_custom_api_response(text: str) -> list[dict[str, Any]]:
     # Already normalized schema
     if "release_slug" in sample and "effort" in sample:
         return items
+    # BenchGecko format
+    if "avg_score" in sample and "provider_slug" in sample:
+        return normalize_benchgecko_models(items)
+    # llmpricing.dev format
+    if "aa" in sample and "lab" in sample:
+        return normalize_llmpricing_models(items)
     # Artificial Analysis v2 API format
     if "evaluations" in sample or "model_creator" in sample:
         return normalize_aa_api_models(items)
@@ -638,10 +778,51 @@ class ModelDataFetcher:
             raise RuntimeError("modelgrep 返回了空的模型列表")
         return normalized
 
+    async def _fetch_llmpricing(self) -> list[dict[str, Any]]:
+        session = await self._get_session()
+        async with session.get(
+            LLMPRICING_API_URL,
+            proxy=self.proxy,
+            headers={"Accept": "application/json"},
+        ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"llmpricing.dev 返回状态码 {resp.status}")
+            body = await resp.json()
+        items = body.get("models") if isinstance(body, dict) else body
+        if not isinstance(items, list) or not items:
+            raise RuntimeError("llmpricing.dev 返回了空的模型列表")
+        normalized = normalize_llmpricing_models(items)
+        if not normalized:
+            raise RuntimeError("llmpricing.dev 未包含带 AA 跑分的模型")
+        return normalized
+
+    async def _fetch_benchgecko(self) -> list[dict[str, Any]]:
+        session = await self._get_session()
+        async with session.get(
+            BENCHGECKO_API_URL,
+            params={"limit": "200"},
+            proxy=self.proxy,
+            headers={"Accept": "application/json"},
+        ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"BenchGecko 返回状态码 {resp.status}")
+            body = await resp.json()
+        items = body.get("data") if isinstance(body, dict) else body
+        if not isinstance(items, list) or not items:
+            raise RuntimeError("BenchGecko 返回了空的模型列表")
+        normalized = normalize_benchgecko_models(items)
+        if not normalized:
+            raise RuntimeError("BenchGecko 未包含有效评分模型")
+        return normalized
+
     async def _fetch_remote(
         self, prefer_source: str, *, allow_custom: bool = True
     ) -> tuple[list[dict[str, Any]], str, bool]:
         """Returns (models, actual_source, is_fallback)."""
+        if prefer_source == "benchgecko":
+            return await self._fetch_benchgecko(), "benchgecko", False
+        if prefer_source == "llmpricing":
+            return await self._fetch_llmpricing(), "llmpricing", False
         if prefer_source == "modelgrep":
             return await self._fetch_modelgrep(), "modelgrep", False
 
@@ -660,20 +841,28 @@ class ModelDataFetcher:
             return models, src, False
 
         # auto: try Artificial Analysis first (has reasoning effort breakdown),
-        # temporarily fallback to modelgrep if AA is unreachable (do NOT poison cache).
+        # temporarily fallback to llmpricing.dev -> modelgrep if AA is unreachable
+        # (do NOT poison cache with degraded fallback).
         try:
             models, src = await self._fetch_artificial_analysis()
             return models, src, False
         except Exception as aa_exc:
             logger.warning(
-                f"[ai_iq] Artificial Analysis 拉取失败，临时回退 modelgrep（不写入缓存）: {aa_exc}"
+                f"[ai_iq] Artificial Analysis 拉取失败，临时回退 llmpricing.dev（不写入缓存）: {aa_exc}"
             )
-            models = await self._fetch_modelgrep()
-            return models, "modelgrep", True
+            try:
+                models = await self._fetch_llmpricing()
+                return models, "llmpricing", True
+            except Exception as lp_exc:
+                logger.warning(
+                    f"[ai_iq] llmpricing.dev 回退失败，继续回退 modelgrep: {lp_exc}"
+                )
+                models = await self._fetch_modelgrep()
+                return models, "modelgrep", True
 
     @staticmethod
     def _is_degraded_cache(prefer: str, cached_source: str) -> bool:
-        return prefer == "auto" and cached_source == "modelgrep"
+        return prefer == "auto" and cached_source in {"llmpricing", "modelgrep"}
 
     async def get_models(
         self, force_refresh: bool = False, source_override: str | None = None

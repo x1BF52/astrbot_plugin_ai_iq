@@ -671,6 +671,24 @@ def build_view_data(
             for i, m in enumerate(top)
         ]
 
+    elif q_lower in {"gecko", "benchgecko", "硬核", "多榜"} or (
+        source == "benchgecko" and not q_lower
+    ):
+        layout = "ranking"
+        title = "AI 模型硬核多榜综合排名 (BenchGecko)"
+        subtitle = (
+            f"聚合 ARC-AGI-2 / FrontierMath / FrontierSWE / GPQA 等多方基准综合分 · 右侧 API 单价 ($/1M)"
+            f"{all_tag}"
+        )
+        ranked = [m for m in working if isinstance(m.get("iq"), (int, float))]
+        ranked.sort(key=lambda m: float(m["iq"]), reverse=True)
+        top = ranked[:max_ranking_items]
+        max_sc = max((float(m["iq"]) for m in top), default=100.0)
+        ranking_cards = [
+            _to_ranking_card(m, score_key="iq", max_score=max_sc, badge=f"#{i + 1}")
+            for i, m in enumerate(top)
+        ]
+
     elif not q_lower and effort_filter is not None:
         # Pure effort query like `/aiiq max` or `/aiiq ultra` -> clean global ranking grid
         layout = "ranking"
@@ -774,6 +792,8 @@ def build_view_data(
     source_labels = {
         "artificial_analysis": "Artificial Analysis 官方实时榜单",
         "artificial_analysis_api": "Artificial Analysis 官方 API v2",
+        "llmpricing": "LLM Pricing (AA v5 + Official Pricing)",
+        "benchgecko": "Source: BenchGecko (benchgecko.ai, CC BY 4.0)",
         "custom_api": "自定义数据源 API",
         "modelgrep": "Artificial Analysis + OpenRouter (via modelgrep)",
     }

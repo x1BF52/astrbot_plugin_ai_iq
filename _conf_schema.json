@@ -9,8 +9,8 @@
     "description": "数据源选择",
     "type": "string",
     "default": "auto",
-    "options": ["auto", "artificial_analysis", "modelgrep"],
-    "hint": "auto：优先 Artificial Analysis（含完整推理强度分档与题均成本），不可达时临时回退 modelgrep（不污染缓存）"
+    "options": ["auto", "artificial_analysis", "llmpricing", "benchgecko", "modelgrep"],
+    "hint": "auto：优先 Artificial Analysis（含完整推理强度分档与题均成本），不可达时临时回退 llmpricing.dev → modelgrep（不污染缓存）"
   },
   "aa_api_key": {
     "description": "Artificial Analysis 官方 API Key（可选）",

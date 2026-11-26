@@ -22,6 +22,7 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 | `/aiiq max` / `/aiiq high` / `/aiiq gemini high` | 按推理强度筛选（支持组合厂商与强度） |
 | `/aiiq 编程` | 按编程评测综合分（Coding）降序排行 |
 | `/aiiq 性价比` | 按「智商 ÷ 题均成本/综合单价」降序推荐（智商 ≥ 20） |
+| `/aiiq 硬核` / `/aiiq gecko` | 查看 BenchGecko 硬核多榜综合分（ARC-AGI-2 / FrontierMath / FrontierSWE / GPQA 等） |
 | `/aiiq 免费` | 查看 `$0` 免费模型智商排行 |
 | `/aiiq 全部 gemini` | 临时关闭过期过滤，查看包含旧代模型的完整列表 |
 | `/aiiq 刷新` | 忽略缓存，强制拉取最新数据 |
@@ -66,8 +67,9 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 
 ## 数据来源
 
-- 主数据源：[Artificial Analysis](https://artificialanalysis.ai/leaderboards/models) 官方实时榜单（含推理强度分档、题均成本、速度与首答延迟）。
-- 回退数据源 & 免费榜：[modelgrep](https://modelgrep.com/api)（聚合 Artificial Analysis 与 OpenRouter 公开数据）。
+- 主数据源：[Artificial Analysis](https://artificialanalysis.ai/leaderboards/models) 官方实时榜单 / v2 API（含推理强度分档、题均成本、速度与首答延迟）。
+- 高速回退数据源：[LLM Pricing](https://llmpricing.dev/api/models.json)（AA v5 + 官方定价 + 题均成本）→ [modelgrep](https://modelgrep.com/api)（兼作 `/aiiq 免费` 数据源）。
+- 硬核多榜数据源：[BenchGecko](https://benchgecko.ai/models)（CC BY 4.0，聚合 ARC-AGI-2 / FrontierMath / FrontierSWE / GPQA 等多方基准）。
 
 ## License
 

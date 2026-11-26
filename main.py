@@ -17,6 +17,7 @@ from .renderer import HTML_TEMPLATE, build_view_data, format_text_fallback
 _MSG_ID_PATTERN = re.compile(r"\s*\[MSG_ID:[^\]]*\]\s*")
 _TRIGGER_SPLIT_RE = re.compile(r"[,，、;；\n]+")
 _FREE_KEYWORDS = {"free", "免费", "白嫖"}
+_GECKO_KEYWORDS = {"gecko", "benchgecko", "硬核", "多榜"}
 
 
 def _build_help_text(primary_cmd: str, all_triggers: tuple[str, ...]) -> str:
@@ -32,6 +33,7 @@ def _build_help_text(primary_cmd: str, all_triggers: tuple[str, ...]) -> str:
         f"• /{primary_cmd} <推理强度> — 按推理强度筛选，如：/{primary_cmd} max、/{primary_cmd} high、/{primary_cmd} gemini high\n"
         f"• /{primary_cmd} 编程 — 按编程评测综合分 (Coding) 排序\n"
         f"• /{primary_cmd} 性价比 — 按「智商 ÷ 题均成本/单价」排序推荐\n"
+        f"• /{primary_cmd} 硬核 — BenchGecko 多榜综合分（ARC-AGI-2 / FrontierMath / FrontierSWE / GPQA），也可用 /{primary_cmd} gecko\n"
         f"• /{primary_cmd} 免费 — 查看 $0 免费模型智商榜\n"
         f"• /{primary_cmd} 全部 <关键词> — 临时关闭过期与无推理过滤，查看完整列表\n"
         f"• /{primary_cmd} 刷新 — 忽略缓存，强制拉取最新数据\n\n"
@@ -159,9 +161,16 @@ class AIIQPlugin(Star):
             force_refresh = True
             arg = arg.split(maxsplit=1)[1].strip()
 
-        # Free $0 models come from OpenRouter via modelgrep
-        tokens_lower = {t.lower() for t in arg.split() if t}
-        source_override = "modelgrep" if (tokens_lower & _FREE_KEYWORDS) else None
+        # Route special commands to dedicated upstream sources
+        tokens = [t for t in arg.split() if t]
+        tokens_lower = {t.lower() for t in tokens}
+        source_override: str | None = None
+        if tokens_lower & _FREE_KEYWORDS:
+            source_override = "modelgrep"
+        elif tokens_lower & _GECKO_KEYWORDS:
+            source_override = "benchgecko"
+            remaining = [t for t in tokens if t.lower() not in _GECKO_KEYWORDS]
+            arg = " ".join(remaining).strip()
 
         try:
             result = await self.fetcher.get_models(
