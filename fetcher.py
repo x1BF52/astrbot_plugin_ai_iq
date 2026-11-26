@@ -60,6 +60,7 @@ _AA_CREATOR_MAP: dict[str, str] = {
 }
 
 EFFORT_LABELS: dict[str, str] = {
+    "extreme": "extreme",
     "ultra": "ultra",
     "max": "max",
     "xhigh": "xhigh",
@@ -84,7 +85,7 @@ def normalize_effort(suffix: str | None, is_reasoning: bool | None) -> tuple[str
             return "non-reasoning", EFFORT_LABELS["non-reasoning"]
         if head in EFFORT_LABELS:
             return head, EFFORT_LABELS[head]
-        for key in ("ultra", "xhigh", "max", "high", "medium", "low", "minimal"):
+        for key in ("extreme", "ultra", "xhigh", "max", "high", "medium", "low", "minimal"):
             if key in head:
                 return key, EFFORT_LABELS[key]
         if "reason" in head or "think" in head:
