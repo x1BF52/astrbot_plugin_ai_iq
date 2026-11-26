@@ -33,8 +33,8 @@
   "max_releases_per_maker": {
     "description": "默认总览每个厂商最多展示的系列行数",
     "type": "int",
-    "default": 2,
-    "hint": "在 /aiiq 默认总览中，每个厂商展示前 N 个主力模型系列（每个系列展开其各推理强度档位）；指定厂商查询（如 /aiiq gemini）会展示该厂全部在役系列"
+    "default": 4,
+    "hint": "在 /aiiq 默认总览中，每个厂商展示前 N 个主力模型系列（默认 4，覆盖旗舰到轻量全档位如 Terra/Luna、Sonnet/Haiku、Hydrogen/Argon）"
   },
   "max_per_maker": {
     "description": "每行最多展示的卡片数量",

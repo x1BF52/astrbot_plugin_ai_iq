@@ -29,8 +29,8 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 
 ## 卡片字段说明
 
-- **左上**：模型系列名 + **推理强度标签**（`max / xhigh / high / medium / low / 推理 / 无推理`）
-- **左下大号数字**：Artificial Analysis 智商指数（`/aiiq 编程` 时为编程综合分）
+- **左上**：完整模型系列名（自动换行，不截断版本号或日期后缀）
+- **左下**：超大号 Artificial Analysis 智商指数（`/aiiq 编程` 时为编程综合分）+ 高对比度**推理强度标签**（`MAX / XHIGH / HIGH / MEDIUM / LOW / 推理 / 无推理`）
 - **右上**：API 单价（`$/1M Tokens`，输入/输出）+ 题均实际成本（`题均 $x.xx`，来自 AA 评测消耗）
 - **右下**：实时输出速度（`tok/s`）· 首答延迟（`s` / `ms`，直观反映思考等待时间）
 
@@ -55,7 +55,7 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 - `filter_outdated`：是否自动过滤过期与旧代模型（默认 `true`）
 - `max_model_age_days`：模型最大保留天数（默认 `180` 天，`0` 表示不限制）
 - `default_makers`：默认总览展示的厂商及顺序（逗号分隔）
-- `max_releases_per_maker`：默认总览每个厂商最多展示的系列行数（默认 `2`）
+- `max_releases_per_maker`：默认总览每个厂商最多展示的系列行数（默认 `4`，覆盖旗舰到轻量全档位）
 - `max_per_maker`：每行最多展示的卡片数量（默认 `6`）
 - `max_ranking_items`：榜单/搜索模式最多展示卡片数（默认 `24`）
 - `request_timeout`：API 请求超时时间（默认 `25` 秒）

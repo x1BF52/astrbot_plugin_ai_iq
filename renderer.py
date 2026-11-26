@@ -510,20 +510,34 @@ def _group_release_rows(
         nonlocal singles_buf
         if singles_buf:
             for chunk in _chunk(singles_buf, max_per_row):
-                rows.append({"cards": [_to_card(m, score_key=score_key) for m in chunk]})
+                rows.append(
+                    {
+                        "cards": [_to_card(m, score_key=score_key) for m in chunk],
+                        "section_start": False,
+                    }
+                )
             singles_buf = []
 
     for grp in sorted_rels:
         grp_sorted = sorted(grp, key=_effort_sort_key)
         if len(grp_sorted) == 1:
-            if rows and len(rows[-1]["cards"]) <= 2 and len(rows[-1]["cards"]) + 1 <= max_per_row:
+            if (
+                rows
+                and len(rows[-1]["cards"]) <= 2
+                and len(rows[-1]["cards"]) + 1 <= max_per_row
+            ):
                 rows[-1]["cards"].append(_to_card(grp_sorted[0], score_key=score_key))
             else:
                 singles_buf.append(grp_sorted[0])
         else:
             _flush_singles()
             for chunk in _chunk(grp_sorted, max_per_row):
-                rows.append({"cards": [_to_card(m, score_key=score_key) for m in chunk]})
+                rows.append(
+                    {
+                        "cards": [_to_card(m, score_key=score_key) for m in chunk],
+                        "section_start": False,
+                    }
+                )
     _flush_singles()
     return rows
 
@@ -560,7 +574,7 @@ def build_view_data(
     is_stale: bool = False,
     filter_outdated: bool = True,
     max_model_age_days: int = 180,
-    max_releases_per_maker: int = 2,
+    max_releases_per_maker: int = 4,
 ) -> dict[str, Any]:
     """Select, filter, sort, and group models into card rows for HTML rendering."""
     raw_q, effort_filter, include_all = _parse_query_tokens(query)
@@ -589,7 +603,7 @@ def build_view_data(
     rows: list[dict[str, Any]] = []
     title = "AI 模型实时智商榜"
     subtitle = (
-        f"左下 AA 智商分 · 型号下方为推理强度 · 右上 API 单价 ($/1M) 与题均成本 · 右下速度 & 首答延迟"
+        f"左下大字 AA 智商分 · 旁侧标签为推理强度 · 右上单价 ($/1M) 与题均成本 · 右下速度 & 首答延迟"
         f"{effort_tag}{all_tag}"
     )
 
@@ -710,6 +724,8 @@ def build_view_data(
                 max_per_row=per_row,
                 score_key="iq",
             )
+            if maker_rows and rows:
+                maker_rows[0]["section_start"] = True
             rows.extend(maker_rows)
 
     updated_str = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d %H:%M")
@@ -741,10 +757,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   body {
     display: inline-block;
     background: #ffffff;
-    padding: 18px 20px 14px 20px;
+    padding: 12px 12px 10px 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
       "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-    color: #1f2937;
+    color: #111827;
     -webkit-font-smoothing: antialiased;
   }
   .header {
@@ -752,36 +768,40 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     align-items: baseline;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     padding: 0 4px;
   }
   .title {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 28px;
+    font-weight: 800;
     color: #111827;
     letter-spacing: 0.2px;
   }
   .subtitle {
-    font-size: 11.5px;
-    color: #6b7280;
+    font-size: 15px;
+    font-weight: 500;
+    color: #4b5563;
   }
   .rows {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 7px;
   }
   .row {
     display: flex;
     justify-content: center;
     flex-wrap: nowrap;
-    gap: 10px;
+    gap: 7px;
+  }
+  .row.section-start {
+    margin-top: 7px;
   }
   .card {
     position: relative;
-    width: 222px;
-    min-height: 84px;
-    border-radius: 9px;
-    border: 1.2px solid var(--border);
+    width: 262px;
+    min-height: 92px;
+    border-radius: 10px;
+    border: 1.6px solid var(--border);
     background: var(--bg);
     overflow: hidden;
     display: flex;
@@ -794,72 +814,90 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     top: 0;
     left: 10px;
     right: 10px;
-    height: 3.5px;
+    height: 4.5px;
     background: var(--accent);
     border-radius: 0 0 3px 3px;
   }
   .card-left {
     flex: 1;
     min-width: 0;
-    padding: 9px 7px 7px 10px;
+    padding: 9px 7px 6px 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
-  .name-block {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
   .model-name {
-    font-size: 12px;
-    line-height: 1.15;
-    font-weight: 600;
+    font-size: 16px;
+    line-height: 1.14;
+    font-weight: 700;
     color: var(--accent);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-break: break-word;
   }
   .badge {
-    font-size: 10px;
-    font-weight: 700;
-    opacity: 0.8;
-    margin-right: 3px;
+    font-size: 12.5px;
+    font-weight: 800;
+    opacity: 0.85;
+    margin-right: 4px;
   }
-  .effort-row {
+  .score-row {
     display: flex;
-    align-items: center;
-    gap: 4px;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 4px;
+  }
+  .score {
+    font-size: 38px;
+    line-height: 0.98;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
   }
   .effort-pill {
     display: inline-block;
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.25;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    padding: 1px 5px;
-    border-radius: 4px;
+    font-weight: 800;
+    letter-spacing: 0.15px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-transform: uppercase;
     color: var(--accent);
     background: var(--pill-bg);
+    border: 1px solid var(--border);
+  }
+  .effort-pill.effort-ultra,
+  .effort-pill.effort-max,
+  .effort-pill.effort-xhigh {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+  }
+  .effort-pill.effort-medium,
+  .effort-pill.effort-low,
+  .effort-pill.effort-minimal {
+    background: #ffffff;
+    color: var(--accent);
+    border-color: var(--border);
+    font-weight: 700;
+  }
+  .effort-pill.effort-reasoning {
+    text-transform: none;
   }
   .effort-pill.effort-non-reasoning {
-    color: #6b7280;
-    background: #eceff3;
-    font-weight: 600;
-  }
-  .score {
-    font-size: 28px;
-    line-height: 1.0;
-    font-weight: 500;
-    color: #1f2937;
-    letter-spacing: -0.6px;
-    margin-top: 4px;
-    font-variant-numeric: tabular-nums;
+    background: #e5e7eb;
+    color: #374151;
+    border-color: #cbd5e1;
+    font-weight: 700;
+    text-transform: none;
   }
   .card-right {
-    width: 90px;
+    width: 112px;
     flex-shrink: 0;
-    border-left: 1px solid var(--divider);
+    border-left: 1.5px solid var(--divider);
     margin: 9px 0 7px 0;
     display: flex;
     flex-direction: column;
@@ -872,20 +910,20 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     align-items: center;
     justify-content: center;
     padding: 0 4px 3px 4px;
-    line-height: 1.15;
+    line-height: 1.14;
     font-variant-numeric: tabular-nums;
   }
   .price-main {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 15.5px;
+    font-weight: 700;
     color: var(--accent);
     white-space: nowrap;
   }
   .price-sub {
-    font-size: 9.5px;
-    font-weight: 500;
-    color: #7c8798;
-    margin-top: 1px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #4b5563;
+    margin-top: 2px;
     white-space: nowrap;
   }
   .metric-bottom {
@@ -893,23 +931,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     display: flex;
     align-items: center;
     justify-content: center;
-    border-top: 1px solid var(--divider);
+    border-top: 1.5px solid var(--divider);
     margin: 0 5px;
     padding: 3px 0 0 0;
-    font-size: 10.5px;
-    font-weight: 500;
-    color: #4b5563;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #374151;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
   .footer {
-    margin-top: 12px;
+    margin-top: 10px;
     padding: 0 4px;
     display: flex;
     justify-content: space-between;
     gap: 16px;
-    font-size: 11px;
-    color: #9ca3af;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #6b7280;
   }
 </style>
 </head>
@@ -920,15 +959,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   </div>
   <div class="rows">
     {% for row in rows %}
-    <div class="row">
+    <div class="row{% if row.section_start %} section-start{% endif %}">
       {% for card in row.cards %}
       <div class="card" style="--accent: {{ card.accent }}; --border: {{ card.border }}; --bg: {{ card.bg }}; --divider: {{ card.divider }}; --pill-bg: {{ card.pill_bg }};">
         <div class="card-left">
-          <div class="name-block">
-            <div class="model-name">{% if card.badge %}<span class="badge">{{ card.badge }}</span>{% endif %}{{ card.name }}</div>
-            {% if card.effort %}<div class="effort-row"><span class="effort-pill effort-{{ card.effort_key }}">{{ card.effort }}</span></div>{% endif %}
+          <div class="model-name">{% if card.badge %}<span class="badge">{{ card.badge }}</span>{% endif %}{{ card.name }}</div>
+          <div class="score-row">
+            <div class="score">{{ card.score }}</div>
+            {% if card.effort %}<span class="effort-pill effort-{{ card.effort_key }}">{{ card.effort }}</span>{% endif %}
           </div>
-          <div class="score">{{ card.score }}</div>
         </div>
         <div class="card-right">
           <div class="metric-top">
