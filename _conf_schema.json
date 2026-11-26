@@ -1,22 +1,40 @@
 {
+  "trigger_keywords": {
+    "description": "唤醒指令词（逗号分隔）",
+    "type": "string",
+    "default": "aiiq",
+    "hint": "默认 aiiq，可填写多个并用逗号分隔（例如 aiiq,模型智商,查智商）；发 /指令词 或 @机器人 均可触发"
+  },
   "data_source": {
     "description": "数据源选择",
     "type": "string",
     "default": "auto",
     "options": ["auto", "artificial_analysis", "modelgrep"],
-    "hint": "auto：优先 Artificial Analysis（含完整推理强度分档与题均成本），不可达时自动回退 modelgrep；也可手动锁定数据源"
+    "hint": "auto：优先 Artificial Analysis（含完整推理强度分档与题均成本），不可达时临时回退 modelgrep（不污染缓存）"
   },
-  "cache_ttl_minutes": {
-    "description": "数据缓存时间（分钟）",
-    "type": "int",
-    "default": 15,
-    "hint": "在此时间内重复查询直接复用本地缓存，避免频繁请求上游接口"
+  "aa_api_key": {
+    "description": "Artificial Analysis 官方 API Key（可选）",
+    "type": "string",
+    "default": "",
+    "hint": "留空则自动拉取 AA 公开榜单；填写后优先通过官方 v2 API 拉取（https://artificialanalysis.ai/api/v2/data/llms/models，免费档 1000 次/天）"
+  },
+  "custom_api_url": {
+    "description": "自定义数据源 API 地址（可选）",
+    "type": "string",
+    "default": "",
+    "hint": "留空使用内置数据源；填写后优先请求该地址，自动兼容 AA 官方 JSON / AA 榜单反代 / modelgrep JSON"
+  },
+  "hide_non_reasoning": {
+    "description": "隐藏「无推理」档位",
+    "type": "bool",
+    "default": true,
+    "hint": "默认开启，隐藏 Non-reasoning 档位；查询时输入「无推理」或「全部」仍可临时查看"
   },
   "filter_outdated": {
     "description": "自动过滤过期 / 旧代模型",
     "type": "bool",
     "default": true,
-    "hint": "开启后自动剔除已被同系列新版本取代的旧模型（如已有 Fable 5.2 时隐藏 5.1、隐藏 Gemini 3.x / DeepSeek 0423 等旧模型）；查询时可加「全部」临时查看"
+    "hint": "开启后自动剔除已被同系列新版本取代的旧模型（如已有 Fable 5.2 时隐藏 5.1）；查询时可加「全部」临时查看"
   },
   "max_model_age_days": {
     "description": "模型最大保留天数（过滤远古模型）",
@@ -34,7 +52,7 @@
     "description": "默认总览每个厂商最多展示的系列行数",
     "type": "int",
     "default": 5,
-    "hint": "在 /aiiq 默认总览中，每个厂商展示前 N 个在役模型系列（默认 5，自动覆盖旗舰到轻量全档位如 Terra/Luna、Sonnet/Haiku、Hydrogen/Argon）"
+    "hint": "在默认总览中，每个厂商展示前 N 个在役模型系列（默认 5，自动覆盖旗舰到轻量全档位）"
   },
   "max_per_maker": {
     "description": "每行最多展示的卡片数量",
@@ -47,6 +65,12 @@
     "type": "int",
     "default": 24,
     "hint": "控制单张图片高度，建议 18~30"
+  },
+  "cache_ttl_minutes": {
+    "description": "数据缓存时间（分钟）",
+    "type": "int",
+    "default": 15,
+    "hint": "在此时间内重复查询直接复用本地缓存；若主源失败触发降级回退，则不会写入长缓存，下次查询会自动重试主源"
   },
   "request_timeout": {
     "description": "API 请求超时时间（秒）",

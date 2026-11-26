@@ -20,11 +20,13 @@ except ImportError:  # pragma: no cover - local test fallback
 
 
 AA_LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models"
+AA_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
 MODELGREP_API_URL = "https://modelgrep.com/api/v1/models"
 
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
 
 _NEXT_RSC_CHUNK_RE = re.compile(r'self\.__next_f\.push\(\[1,"(.*?)"\]\)', re.S)
+_PAREN_SUFFIX_RE = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
 
 _AA_CREATOR_MAP: dict[str, str] = {
     "anthropic": "anthropic",
@@ -301,6 +303,154 @@ def normalize_modelgrep_models(raw_models: list[dict[str, Any]]) -> list[dict[st
     return normalized
 
 
+def normalize_aa_api_models(raw_models: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize Artificial Analysis official v2 API records into the unified schema."""
+    normalized: list[dict[str, Any]] = []
+    for item in raw_models:
+        if not isinstance(item, dict):
+            continue
+        evals = item.get("evaluations") if isinstance(item.get("evaluations"), dict) else {}
+        iq = evals.get("artificial_analysis_intelligence_index")
+        coding = evals.get("artificial_analysis_coding_index")
+        if iq is None and coding is None:
+            continue
+
+        raw_name = str(item.get("name") or item.get("slug") or "").strip()
+        suffix = item.get("suffix")
+        base_name = raw_name
+        if not suffix:
+            m_paren = _PAREN_SUFFIX_RE.match(raw_name)
+            if m_paren:
+                candidate = m_paren.group(2).strip()
+                c_low = candidate.lower()
+                if any(
+                    k in c_low
+                    for k in (
+                        "extreme",
+                        "ultra",
+                        "max",
+                        "xhigh",
+                        "high",
+                        "medium",
+                        "low",
+                        "minimal",
+                        "reason",
+                        "think",
+                        "non-reasoning",
+                        "adaptive",
+                    )
+                ):
+                    base_name = m_paren.group(1).strip()
+                    suffix = candidate
+
+        creator_obj = (
+            item.get("model_creator") if isinstance(item.get("model_creator"), dict) else {}
+        )
+        maker = _normalize_aa_creator(
+            creator_obj.get("name") or creator_obj.get("slug") or item.get("maker")
+        )
+        rel_slug = re.sub(r"[^a-z0-9.+-]+", "-", base_name.lower()).strip("-") or str(
+            item.get("slug") or item.get("id") or ""
+        )
+        is_reasoning = item.get("reasoning_model")
+        effort, effort_label = normalize_effort(suffix, is_reasoning)
+
+        pricing = item.get("pricing") if isinstance(item.get("pricing"), dict) else {}
+        pin = pricing.get("price_1m_input_tokens")
+        pout = pricing.get("price_1m_output_tokens")
+
+        cost_obj = (
+            item.get("artificial_analysis_intelligence_index_cost")
+            if isinstance(item.get("artificial_analysis_intelligence_index_cost"), dict)
+            else {}
+        )
+        cpt_obj = (
+            cost_obj.get("cost_per_task")
+            if isinstance(cost_obj.get("cost_per_task"), dict)
+            else {}
+        )
+        cost_per_task = cpt_obj.get("total_cost")
+
+        perf_v3 = (
+            item.get("performance_v3")
+            if isinstance(item.get("performance_v3"), dict)
+            else {}
+        )
+        tps = item.get("median_output_tokens_per_second")
+        if tps is None:
+            tps = perf_v3.get("mean_output_tokens_per_second") or perf_v3.get(
+                "median_output_tokens_per_second"
+            )
+        latency_s = item.get("median_time_to_first_answer_token")
+        if latency_s is None:
+            latency_s = item.get("median_time_to_first_token_seconds")
+        if latency_s is None:
+            latency_s = perf_v3.get("mean_time_to_first_answer_token_seconds") or perf_v3.get(
+                "mean_time_to_first_token_seconds"
+            )
+        time_per_task = perf_v3.get("time_per_task_seconds")
+
+        release_date = item.get("release_date")
+        normalized.append(
+            {
+                "id": str(item.get("id") or item.get("slug") or f"{rel_slug}:{effort}"),
+                "release_slug": rel_slug,
+                "release_name": base_name,
+                "name": raw_name,
+                "effort": effort,
+                "effort_label": effort_label,
+                "maker": maker,
+                "release_date": release_date,
+                "created_ts": _parse_iso_date_ts(release_date),
+                "deprecated": bool(item.get("deprecated")),
+                "is_reasoning": bool(is_reasoning) if is_reasoning is not None else (effort != "non-reasoning"),
+                "iq": float(iq) if isinstance(iq, (int, float)) else None,
+                "coding": float(coding) if isinstance(coding, (int, float)) else None,
+                "price_in": float(pin) if isinstance(pin, (int, float)) else None,
+                "price_out": float(pout) if isinstance(pout, (int, float)) else None,
+                "cost_per_task": float(cost_per_task)
+                if isinstance(cost_per_task, (int, float))
+                else None,
+                "time_per_task": float(time_per_task)
+                if isinstance(time_per_task, (int, float))
+                else None,
+                "tps": float(tps) if isinstance(tps, (int, float)) else None,
+                "latency_s": float(latency_s)
+                if isinstance(latency_s, (int, float))
+                else None,
+                "source": "artificial_analysis_api",
+            }
+        )
+    return normalized
+
+
+def parse_custom_api_response(text: str) -> list[dict[str, Any]]:
+    """Auto-detect and parse response from a custom API / reverse proxy URL."""
+    stripped = text.lstrip()
+    if stripped.startswith("<"):
+        return parse_aa_leaderboard_html(text)
+
+    body = json.loads(text)
+    items = body.get("data") if isinstance(body, dict) else body
+    if isinstance(body, dict) and items is None:
+        items = body.get("models")
+    if not isinstance(items, list) or not items:
+        raise RuntimeError("自定义 API 返回了空的模型列表")
+
+    sample = next((x for x in items if isinstance(x, dict)), None)
+    if sample is None:
+        raise RuntimeError("自定义 API 返回数据格式无法识别")
+
+    # Already normalized schema
+    if "release_slug" in sample and "effort" in sample:
+        return items
+    # Artificial Analysis v2 API format
+    if "evaluations" in sample or "model_creator" in sample:
+        return normalize_aa_api_models(items)
+    # modelgrep format
+    return normalize_modelgrep_models(items)
+
+
 @dataclass
 class FetchResult:
     models: list[dict[str, Any]]
@@ -308,6 +458,7 @@ class FetchResult:
     source: str = "artificial_analysis"
     from_cache: bool = False
     is_stale: bool = False
+    is_fallback: bool = False
     error: str | None = None
 
 
@@ -321,12 +472,16 @@ class ModelDataFetcher:
         timeout_seconds: int = 25,
         proxy: str = "",
         data_source: str = "auto",
+        aa_api_key: str = "",
+        custom_api_url: str = "",
     ) -> None:
         self.cache_file = cache_file
         self.ttl_seconds = max(60, ttl_seconds)
         self.timeout_seconds = max(5, timeout_seconds)
         self.proxy = proxy.strip() or None
         self.data_source = (data_source or "auto").strip().lower()
+        self.aa_api_key = (aa_api_key or "").strip()
+        self.custom_api_url = (custom_api_url or "").strip()
         self._lock = asyncio.Lock()
         self._session: aiohttp.ClientSession | None = None
         self._mem_cache: dict[str, tuple[list[dict[str, Any]], float, str]] = {}
@@ -395,7 +550,52 @@ class ModelDataFetcher:
         except Exception as exc:
             logger.warning(f"[ai_iq] 写入本地缓存失败 ({bucket}): {exc}")
 
-    async def _fetch_artificial_analysis(self) -> list[dict[str, Any]]:
+    async def _fetch_aa_api(self) -> list[dict[str, Any]]:
+        session = await self._get_session()
+        headers = {
+            "Accept": "application/json",
+            "x-api-key": self.aa_api_key,
+        }
+        async with session.get(
+            AA_API_URL,
+            proxy=self.proxy,
+            headers=headers,
+        ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"Artificial Analysis API 返回状态码 {resp.status}")
+            body = await resp.json()
+        items = body.get("data") if isinstance(body, dict) else body
+        if not isinstance(items, list) or not items:
+            raise RuntimeError("Artificial Analysis API 返回了空的模型列表")
+        normalized = normalize_aa_api_models(items)
+        if not normalized:
+            raise RuntimeError("Artificial Analysis API 未包含带跑分模型")
+        return normalized
+
+    async def _fetch_custom_api(self) -> list[dict[str, Any]]:
+        session = await self._get_session()
+        headers: dict[str, str] = {"Accept": "application/json, text/html"}
+        if self.aa_api_key:
+            headers["x-api-key"] = self.aa_api_key
+            headers["Authorization"] = f"Bearer {self.aa_api_key}"
+        async with session.get(
+            self.custom_api_url,
+            proxy=self.proxy,
+            headers=headers,
+        ) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"自定义 API 返回状态码 {resp.status}")
+            text = await resp.text()
+        return parse_custom_api_response(text)
+
+    async def _fetch_artificial_analysis(self) -> tuple[list[dict[str, Any]], str]:
+        if self.aa_api_key:
+            try:
+                return await self._fetch_aa_api(), "artificial_analysis_api"
+            except Exception as api_exc:
+                logger.warning(
+                    f"[ai_iq] Artificial Analysis 官方 API 拉取失败，尝试公开榜单页: {api_exc}"
+                )
         session = await self._get_session()
         async with session.get(
             AA_LEADERBOARD_URL,
@@ -405,7 +605,7 @@ class ModelDataFetcher:
             if resp.status != 200:
                 raise RuntimeError(f"Artificial Analysis 返回状态码 {resp.status}")
             html = await resp.text()
-        return parse_aa_leaderboard_html(html)
+        return parse_aa_leaderboard_html(html), "artificial_analysis"
 
     async def _fetch_modelgrep(self) -> list[dict[str, Any]]:
         session = await self._get_session()
@@ -443,22 +643,42 @@ class ModelDataFetcher:
             raise RuntimeError("modelgrep 返回了空的模型列表")
         return normalized
 
-    async def _fetch_remote(self, prefer_source: str) -> tuple[list[dict[str, Any]], str]:
+    async def _fetch_remote(
+        self, prefer_source: str, *, allow_custom: bool = True
+    ) -> tuple[list[dict[str, Any]], str, bool]:
+        """Returns (models, actual_source, is_fallback)."""
         if prefer_source == "modelgrep":
-            return await self._fetch_modelgrep(), "modelgrep"
-        if prefer_source == "artificial_analysis":
-            return await self._fetch_artificial_analysis(), "artificial_analysis"
+            return await self._fetch_modelgrep(), "modelgrep", False
 
-        # auto: try Artificial Analysis first (has reasoning effort breakdown), fallback to modelgrep
+        if allow_custom and self.custom_api_url:
+            try:
+                return await self._fetch_custom_api(), "custom_api", False
+            except Exception as custom_exc:
+                if prefer_source != "auto":
+                    raise
+                logger.warning(
+                    f"[ai_iq] 自定义 API 拉取失败，回退内置主源: {custom_exc}"
+                )
+
+        if prefer_source == "artificial_analysis":
+            models, src = await self._fetch_artificial_analysis()
+            return models, src, False
+
+        # auto: try Artificial Analysis first (has reasoning effort breakdown),
+        # temporarily fallback to modelgrep if AA is unreachable (do NOT poison cache).
         try:
-            models = await self._fetch_artificial_analysis()
-            return models, "artificial_analysis"
+            models, src = await self._fetch_artificial_analysis()
+            return models, src, False
         except Exception as aa_exc:
             logger.warning(
-                f"[ai_iq] Artificial Analysis 拉取失败，自动回退 modelgrep: {aa_exc}"
+                f"[ai_iq] Artificial Analysis 拉取失败，临时回退 modelgrep（不写入缓存）: {aa_exc}"
             )
             models = await self._fetch_modelgrep()
-            return models, "modelgrep"
+            return models, "modelgrep", True
+
+    @staticmethod
+    def _is_degraded_cache(prefer: str, cached_source: str) -> bool:
+        return prefer == "auto" and cached_source == "modelgrep"
 
     async def get_models(
         self, force_refresh: bool = False, source_override: str | None = None
@@ -468,7 +688,12 @@ class ModelDataFetcher:
         now = time.time()
 
         mem = self._mem_cache.get(bucket)
-        if not force_refresh and mem and (now - mem[1]) < self.ttl_seconds:
+        if (
+            not force_refresh
+            and mem
+            and (now - mem[1]) < self.ttl_seconds
+            and not self._is_degraded_cache(prefer, mem[2])
+        ):
             return FetchResult(
                 models=mem[0],
                 fetched_at=mem[1],
@@ -479,7 +704,12 @@ class ModelDataFetcher:
         async with self._lock:
             now = time.time()
             mem = self._mem_cache.get(bucket)
-            if not force_refresh and mem and (now - mem[1]) < self.ttl_seconds:
+            if (
+                not force_refresh
+                and mem
+                and (now - mem[1]) < self.ttl_seconds
+                and not self._is_degraded_cache(prefer, mem[2])
+            ):
                 return FetchResult(
                     models=mem[0],
                     fetched_at=mem[1],
@@ -492,6 +722,7 @@ class ModelDataFetcher:
                 not force_refresh
                 and disk_cache is not None
                 and (now - disk_cache[1]) < self.ttl_seconds
+                and not self._is_degraded_cache(prefer, disk_cache[2])
             ):
                 self._mem_cache[bucket] = disk_cache
                 return FetchResult(
@@ -502,15 +733,20 @@ class ModelDataFetcher:
                 )
 
             try:
-                models, actual_source = await self._fetch_remote(prefer)
+                models, actual_source, is_fallback = await self._fetch_remote(
+                    prefer, allow_custom=(source_override is None)
+                )
                 fetched_at = time.time()
-                self._mem_cache[bucket] = (models, fetched_at, actual_source)
-                self._save_disk_cache(bucket, models, fetched_at, actual_source)
+                # Only persist non-fallback primary data; never poison cache with degraded fallback
+                if not is_fallback:
+                    self._mem_cache[bucket] = (models, fetched_at, actual_source)
+                    self._save_disk_cache(bucket, models, fetched_at, actual_source)
                 return FetchResult(
                     models=models,
                     fetched_at=fetched_at,
                     source=actual_source,
                     from_cache=False,
+                    is_fallback=is_fallback,
                 )
             except Exception as exc:
                 logger.error(f"[ai_iq] 获取远程模型数据失败 ({prefer}): {exc}")

@@ -562,7 +562,9 @@ def build_view_data(
     *,
     source: str = "artificial_analysis",
     is_stale: bool = False,
+    is_fallback: bool = False,
     filter_outdated: bool = True,
+    hide_non_reasoning: bool = True,
     max_model_age_days: int = 180,
     max_releases_per_maker: int = 5,
 ) -> dict[str, Any]:
@@ -582,6 +584,13 @@ def build_view_data(
         )
     elif not is_free_mode:
         working = [m for m in working if not str(m.get("id") or "").endswith(":free")]
+
+    if hide_non_reasoning and effort_filter != "non-reasoning" and not include_all:
+        working = [
+            m
+            for m in working
+            if str(m.get("effort") or "").lower() != "non-reasoning"
+        ]
 
     if effort_filter is not None:
         working = [m for m in working if str(m.get("effort") or "").lower() == effort_filter]
@@ -755,12 +764,20 @@ def build_view_data(
                 sections.append(sec)
 
     updated_str = datetime.fromtimestamp(fetched_at).strftime("%Y-%m-%d %H:%M")
-    stale_note = "（上游暂不可用，当前为历史缓存）" if is_stale else ""
-    source_label = (
-        "Artificial Analysis 官方实时榜单"
-        if source == "artificial_analysis"
-        else "Artificial Analysis + OpenRouter (via modelgrep)"
-    )
+    if is_fallback:
+        stale_note = "（主源暂不可达，当前为临时回退，下次查询将自动重试）"
+    elif is_stale:
+        stale_note = "（上游暂不可用，当前为历史缓存）"
+    else:
+        stale_note = ""
+
+    source_labels = {
+        "artificial_analysis": "Artificial Analysis 官方实时榜单",
+        "artificial_analysis_api": "Artificial Analysis 官方 API v2",
+        "custom_api": "自定义数据源 API",
+        "modelgrep": "Artificial Analysis + OpenRouter (via modelgrep)",
+    }
+    source_label = source_labels.get(source, source)
     total_cards = (
         sum(s["tile_count"] for s in sections)
         if layout == "matrix"
