@@ -5,7 +5,7 @@ desc: |
   查询全球主流 AI 模型（GPT / Gemini / Claude / DeepSeek / Qwen / GLM / Kimi / Grok 等 20+ 厂商、150+ 模型）的实时智商评分、API 输入/输出价格、输出速度与首字延迟，并以分组配色卡片图直观呈现，方便快速选模型干活。
 
   支持 `/aiiq` 总览、`/aiiq <厂商/关键词>` 筛选、`/aiiq 编程` 编程榜、`/aiiq 性价比` 性价比榜、`/aiiq 免费` 免费模型榜。
-version: 1.0.1
+version: 1.0.2
 author: x1BF52
 repo: https://github.com/x1BF52/astrbot_plugin_ai_iq
 social_link: https://github.com/x1BF52

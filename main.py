@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -12,6 +13,9 @@ except ImportError:  # pragma: no cover
 
 from .fetcher import ModelDataFetcher
 from .renderer import HTML_TEMPLATE, build_view_data, format_text_fallback
+
+_MSG_ID_PATTERN = re.compile(r"\s*\[MSG_ID:[^\]]*\]\s*")
+_TRIGGERS = ("aiiq", "模型智商")
 
 HELP_TEXT = """AI 模型实时智商榜 - 使用说明
 • /aiiq — 查看主流厂商（Claude / GPT / Gemini / DeepSeek / Qwen / GLM / Kimi / Grok）分组卡片图
@@ -60,7 +64,41 @@ class AIIQPlugin(Star):
     @filter.command("aiiq", alias={"模型智商"})
     async def cmd_aiiq(self, event: AstrMessageEvent, query: GreedyStr = ""):
         """查询全球主流 AI 模型实时智商、价格与速度延迟"""
-        arg = str(query or "").strip()
+        async for res in self._run_query(event, str(query or "")):
+            yield res
+
+    @filter.event_message_type(filter.EventMessageType.ALL)
+    async def fallback_aiiq(self, event: AstrMessageEvent):
+        """兜底匹配：消息带 [MSG_ID:...] 等后缀导致 /aiiq 指令未命中时仍能触发"""
+        raw = event.get_message_str() or ""
+        if "aiiq" not in raw.lower() and "模型智商" not in raw:
+            return
+        for handler in event.get_extra("activated_handlers") or []:
+            if getattr(handler, "handler_name", "") == "cmd_aiiq":
+                return
+        logger.info(f"[ai_iq] 指令未直接命中，原始消息: {raw!r}")
+        if not event.is_at_or_wake_command and not raw.lstrip().startswith(("/", "／")):
+            return
+        arg = self._extract_query(raw)
+        if arg is None:
+            return
+        event.stop_event()
+        async for res in self._run_query(event, arg):
+            yield res
+
+    @staticmethod
+    def _extract_query(raw: str) -> str | None:
+        text = _MSG_ID_PATTERN.sub("", raw).strip().lstrip("/／").strip()
+        lowered = text.lower()
+        for trigger in _TRIGGERS:
+            if lowered == trigger:
+                return ""
+            if lowered.startswith(trigger) and text[len(trigger)] in " \t\n[":
+                return _MSG_ID_PATTERN.sub("", text[len(trigger) :]).strip()
+        return None
+
+    async def _run_query(self, event: AstrMessageEvent, arg: str):
+        arg = _MSG_ID_PATTERN.sub("", arg).strip()
         logger.info(f"[ai_iq] 收到查询: {arg!r}")
 
         if arg.lower() in {"help", "帮助", "-h", "?"}:
