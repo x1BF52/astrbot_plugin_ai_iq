@@ -55,7 +55,7 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 - `filter_outdated`：是否自动过滤过期与旧代模型（默认 `true`）
 - `max_model_age_days`：模型最大保留天数（默认 `180` 天，`0` 表示不限制）
 - `default_makers`：默认总览展示的厂商及顺序（逗号分隔）
-- `max_releases_per_maker`：默认总览每个厂商最多展示的系列行数（默认 `4`，覆盖旗舰到轻量全档位）
+- `max_series_per_maker`：默认总览每个厂商最多展示的系列行数（默认 `5`，自动覆盖旗舰到轻量全档位）
 - `max_per_maker`：每行最多展示的卡片数量（默认 `6`）
 - `max_ranking_items`：榜单/搜索模式最多展示卡片数（默认 `24`）
 - `request_timeout`：API 请求超时时间（默认 `25` 秒）

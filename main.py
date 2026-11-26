@@ -139,7 +139,7 @@ class AIIQPlugin(Star):
         filter_outdated = bool(self.config.get("filter_outdated", True))
         max_model_age_days = max(0, int(self.config.get("max_model_age_days", 180)))
         max_releases_per_maker = max(
-            1, int(self.config.get("max_releases_per_maker", 4))
+            1, int(self.config.get("max_series_per_maker", 5))
         )
 
         view_data = build_view_data(

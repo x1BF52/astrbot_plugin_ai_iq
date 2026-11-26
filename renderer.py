@@ -794,11 +794,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     gap: 7px;
   }
   .row.section-start {
-    margin-top: 7px;
+    margin-top: 10px;
   }
   .card {
     position: relative;
-    width: 262px;
+    width: 280px;
     min-height: 92px;
     border-radius: 10px;
     border: 1.6px solid var(--border);
@@ -821,20 +821,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .card-left {
     flex: 1;
     min-width: 0;
-    padding: 9px 7px 6px 10px;
+    padding: 10px 8px 7px 11px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
   .model-name {
-    font-size: 16px;
-    line-height: 1.14;
+    font-size: 15px;
+    line-height: 1.18;
     font-weight: 700;
+    letter-spacing: -0.15px;
     color: var(--accent);
-    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .badge {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 800;
     opacity: 0.85;
     margin-right: 4px;
@@ -842,25 +843,25 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   .score-row {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 5px;
-    margin-top: 4px;
+    justify-content: flex-start;
+    gap: 7px;
+    margin-top: 5px;
   }
   .score {
-    font-size: 38px;
+    font-size: 35px;
     line-height: 0.98;
     font-weight: 700;
     color: #111827;
-    letter-spacing: -1px;
+    letter-spacing: -0.8px;
     font-variant-numeric: tabular-nums;
   }
   .effort-pill {
     display: inline-block;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.25;
     font-weight: 800;
-    letter-spacing: 0.15px;
-    padding: 2px 6px;
+    letter-spacing: 0.1px;
+    padding: 2px 5px;
     border-radius: 5px;
     white-space: nowrap;
     flex-shrink: 0;
@@ -895,7 +896,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     text-transform: none;
   }
   .card-right {
-    width: 112px;
+    width: 114px;
     flex-shrink: 0;
     border-left: 1.5px solid var(--divider);
     margin: 9px 0 7px 0;
@@ -914,13 +915,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     font-variant-numeric: tabular-nums;
   }
   .price-main {
-    font-size: 15.5px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--accent);
     white-space: nowrap;
   }
   .price-sub {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
     color: #4b5563;
     margin-top: 2px;
@@ -932,9 +933,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     align-items: center;
     justify-content: center;
     border-top: 1.5px solid var(--divider);
-    margin: 0 5px;
-    padding: 3px 0 0 0;
-    font-size: 13.5px;
+    margin: 0 4px;
+    padding: 3px 2px 0 2px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #374151;
     white-space: nowrap;

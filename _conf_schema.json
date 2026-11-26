@@ -30,11 +30,11 @@
     "default": "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
     "hint": "按填写顺序分行展示。可选：anthropic, openai, google, deepseek, qwen, z-ai, moonshotai, x-ai, meta, mistralai, minimax, tencent, xiaomi"
   },
-  "max_releases_per_maker": {
+  "max_series_per_maker": {
     "description": "默认总览每个厂商最多展示的系列行数",
     "type": "int",
-    "default": 4,
-    "hint": "在 /aiiq 默认总览中，每个厂商展示前 N 个主力模型系列（默认 4，覆盖旗舰到轻量全档位如 Terra/Luna、Sonnet/Haiku、Hydrogen/Argon）"
+    "default": 5,
+    "hint": "在 /aiiq 默认总览中，每个厂商展示前 N 个在役模型系列（默认 5，自动覆盖旗舰到轻量全档位如 Terra/Luna、Sonnet/Haiku、Hydrogen/Argon）"
   },
   "max_per_maker": {
     "description": "每行最多展示的卡片数量",
