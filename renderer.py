@@ -843,7 +843,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     display: inline-block;
-    width: 1200px;
+    width: 1090px;
     background: #eef2f7;
     padding: 18px 20px 14px 20px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
@@ -970,10 +970,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     min-width: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: 8px;
   }
   .tile {
-    width: 148px;
+    width: 156px;
     border-radius: 10px;
     border: 1.4px solid #e2e8f0;
     background: #f8fafc;

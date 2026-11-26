@@ -15,7 +15,7 @@ from astrbot.api import logger
 
 
 AA_LEADERBOARD_URL = "https://artificialanalysis.ai/leaderboards/models"
-AA_API_URL = "https://artificialanalysis.ai/api/v2/data/llms/models"
+AA_API_URL = "https://artificialanalysis.ai/api/v2/language/models/free"
 LLMPRICING_API_URL = "https://llmpricing.dev/api/models.json"
 BENCHGECKO_API_URL = "https://benchgecko.ai/api/v1/models"
 MODELGREP_API_URL = "https://modelgrep.com/api/v1/models"
@@ -317,6 +317,8 @@ def normalize_aa_api_models(raw_models: list[dict[str, Any]]) -> list[dict[str, 
         evals = item.get("evaluations") if isinstance(item.get("evaluations"), dict) else {}
         iq = evals.get("artificial_analysis_intelligence_index")
         coding = evals.get("artificial_analysis_coding_index")
+        if coding is None:
+            coding = evals.get("artificial_analysis_engineering_index")
         if iq is None and coding is None:
             continue
 
@@ -381,18 +383,25 @@ def normalize_aa_api_models(raw_models: list[dict[str, Any]]) -> list[dict[str, 
             if isinstance(item.get("performance_v3"), dict)
             else {}
         )
-        tps = item.get("median_output_tokens_per_second")
-        if tps is None:
-            tps = perf_v3.get("mean_output_tokens_per_second") or perf_v3.get(
-                "median_output_tokens_per_second"
-            )
-        latency_s = item.get("median_time_to_first_answer_token")
-        if latency_s is None:
-            latency_s = item.get("median_time_to_first_token_seconds")
-        if latency_s is None:
-            latency_s = perf_v3.get("mean_time_to_first_answer_token_seconds") or perf_v3.get(
-                "mean_time_to_first_token_seconds"
-            )
+        perf_legacy = (
+            item.get("performance")
+            if isinstance(item.get("performance"), dict)
+            else {}
+        )
+        tps = (
+            perf_v3.get("mean_output_tokens_per_second")
+            or perf_v3.get("median_output_tokens_per_second")
+            or perf_legacy.get("median_output_tokens_per_second")
+            or item.get("median_output_tokens_per_second")
+        )
+        latency_s = (
+            perf_v3.get("mean_time_to_first_answer_token_seconds")
+            or perf_v3.get("mean_time_to_first_token_seconds")
+            or perf_legacy.get("median_time_to_first_answer_token_seconds")
+            or perf_legacy.get("median_time_to_first_token_seconds")
+            or item.get("median_time_to_first_answer_token")
+            or item.get("median_time_to_first_token_seconds")
+        )
         time_per_task = perf_v3.get("time_per_task_seconds")
 
         release_date = item.get("release_date")
@@ -701,16 +710,35 @@ class ModelDataFetcher:
             "Accept": "application/json",
             "x-api-key": self.aa_api_key,
         }
-        async with session.get(
-            AA_API_URL,
-            proxy=self.proxy,
-            headers=headers,
-        ) as resp:
-            if resp.status != 200:
-                raise RuntimeError(f"Artificial Analysis API 返回状态码 {resp.status}")
-            body = await resp.json(content_type=None)
-        items = body.get("data") if isinstance(body, dict) else body
-        if not isinstance(items, list) or not items:
+
+        async def _get_page(page: int) -> dict[str, Any]:
+            async with session.get(
+                AA_API_URL,
+                params={"page": str(page)},
+                proxy=self.proxy,
+                headers=headers,
+            ) as resp:
+                if resp.status != 200:
+                    raise RuntimeError(f"Artificial Analysis API 返回状态码 {resp.status}")
+                body = await resp.json(content_type=None)
+                if not isinstance(body, dict):
+                    return {"data": body if isinstance(body, list) else []}
+                return body
+
+        first = await _get_page(1)
+        items: list[Any] = list(first.get("data") or [])
+        pagination = first.get("pagination") if isinstance(first.get("pagination"), dict) else {}
+        total_pages = int(pagination.get("total_pages") or 1)
+        total_pages = max(1, min(12, total_pages))
+
+        if total_pages > 1:
+            rest_pages = await asyncio.gather(
+                *(_get_page(p) for p in range(2, total_pages + 1))
+            )
+            for page_body in rest_pages:
+                items.extend(page_body.get("data") or [])
+
+        if not items:
             raise RuntimeError("Artificial Analysis API 返回了空的模型列表")
         normalized = normalize_aa_api_models(items)
         if not normalized:

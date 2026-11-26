@@ -222,7 +222,7 @@ class AIIQPlugin(Star):
             yield event.plain_result(f"获取实时模型智商数据失败：{err_msg}")
             return
 
-        max_per_maker = max(1, int(self.config.get("max_per_maker", 6)))
+        max_per_maker = max(1, int(self.config.get("max_per_maker", 5)))
         max_ranking_items = max(6, int(self.config.get("max_ranking_items", 24)))
         filter_outdated = bool(self.config.get("filter_outdated", True))
         hide_non_reasoning = bool(self.config.get("hide_non_reasoning", True))

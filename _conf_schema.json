@@ -24,7 +24,7 @@
     "type": "string",
     "default": "",
     "secret": true,
-    "hint": "留空则自动拉取 AA 公开榜单；填写后优先通过官方 v2 API 拉取（https://artificialanalysis.ai/api/v2/data/llms/models，免费档 1000 次/天）"
+    "hint": "留空则自动拉取 AA 公开榜单；填写后优先通过官方 v2 API 并发拉取（https://artificialanalysis.ai/api/v2/language/models/free，免费档 1000 次/天）"
   },
   "custom_api_url": {
     "description": "自定义数据源 API 地址（可选）",
@@ -101,8 +101,8 @@
   "max_per_maker": {
     "description": "每行最多展示的卡片数量",
     "type": "int",
-    "default": 6,
-    "hint": "建议 5~6 个，与每行卡片宽度最协调"
+    "default": 5,
+    "hint": "默认 5 个，与隐藏「无推理」后的 5 档卡片宽度最协调"
   },
   "max_ranking_items": {
     "description": "榜单模式（编程/性价比/硬核/免费/搜索）最多展示卡片数",

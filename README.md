@@ -61,7 +61,7 @@ AstrBot 实时 AI 模型智商榜插件。一条指令查询全球主流大模�
 - `selected_makers`：默认展示的主流厂商（多选下拉框，按勾选顺序分段展示）
 - `custom_makers`：自定义追加厂商（逗号分隔，如 `stepfun,nvidia,cohere`，追加在勾选厂商之后）
 - `max_series_per_maker`：默认总览每个厂商最多展示的系列行数（默认 `5`，自动覆盖旗舰到轻量全档位）
-- `max_per_maker`：每行最多展示的卡片数量（默认 `6`）
+- `max_per_maker`：每行最多展示的卡片数量（默认 `5`）
 - `max_ranking_items`：榜单/搜索模式最多展示卡片数（默认 `24`）
 - `request_timeout`：API 请求超时时间（秒，默认 `25`）
 - `proxy`：可选 HTTP 代理地址（宿主机 Clash 可填 `http://127.0.0.1:7890`，Docker 内填 `http://host.docker.internal:7890`）
