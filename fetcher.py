@@ -598,6 +598,11 @@ class FetchResult:
     error: str | None = None
 
 
+def _fmt_exc(exc: BaseException) -> str:
+    msg = str(exc).strip()
+    return f"{type(exc).__name__}: {msg}" if msg else type(exc).__name__
+
+
 class ModelDataFetcher:
     """Fetches and caches realtime LLM benchmark, reasoning effort, pricing, and speed data."""
 
@@ -624,7 +629,11 @@ class ModelDataFetcher:
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            timeout = aiohttp.ClientTimeout(total=self.timeout_seconds)
+            timeout = aiohttp.ClientTimeout(
+                total=self.timeout_seconds,
+                sock_connect=min(8, self.timeout_seconds),
+                sock_read=self.timeout_seconds,
+            )
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -699,7 +708,7 @@ class ModelDataFetcher:
         ) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"Artificial Analysis API 返回状态码 {resp.status}")
-            body = await resp.json()
+            body = await resp.json(content_type=None)
         items = body.get("data") if isinstance(body, dict) else body
         if not isinstance(items, list) or not items:
             raise RuntimeError("Artificial Analysis API 返回了空的模型列表")
@@ -730,7 +739,7 @@ class ModelDataFetcher:
                 return await self._fetch_aa_api(), "artificial_analysis_api"
             except Exception as api_exc:
                 logger.warning(
-                    f"[ai_iq] Artificial Analysis 官方 API 拉取失败，尝试公开榜单页: {api_exc}"
+                    f"[ai_iq] Artificial Analysis 官方 API 拉取失败，尝试公开榜单页: {_fmt_exc(api_exc)}"
                 )
         session = await self._get_session()
         async with session.get(
@@ -764,7 +773,7 @@ class ModelDataFetcher:
             ) as resp:
                 if resp.status != 200:
                     raise RuntimeError(f"modelgrep 返回状态码 {resp.status}")
-                body = await resp.json()
+                body = await resp.json(content_type=None)
 
             batch = body.get("data") or []
             all_models.extend(batch)
@@ -788,7 +797,7 @@ class ModelDataFetcher:
         ) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"llmpricing.dev 返回状态码 {resp.status}")
-            body = await resp.json()
+            body = await resp.json(content_type=None)
         items = body.get("models") if isinstance(body, dict) else body
         if not isinstance(items, list) or not items:
             raise RuntimeError("llmpricing.dev 返回了空的模型列表")
@@ -807,7 +816,7 @@ class ModelDataFetcher:
         ) as resp:
             if resp.status != 200:
                 raise RuntimeError(f"BenchGecko 返回状态码 {resp.status}")
-            body = await resp.json()
+            body = await resp.json(content_type=None)
         items = body.get("data") if isinstance(body, dict) else body
         if not isinstance(items, list) or not items:
             raise RuntimeError("BenchGecko 返回了空的模型列表")
@@ -815,6 +824,46 @@ class ModelDataFetcher:
         if not normalized:
             raise RuntimeError("BenchGecko 未包含有效评分模型")
         return normalized
+
+    async def _fetch_fallback_race(self) -> tuple[list[dict[str, Any]], str]:
+        """Race llmpricing.dev and modelgrep concurrently with a bounded timeout."""
+        fb_timeout = min(12, self.timeout_seconds)
+        t0 = time.monotonic()
+
+        async def _run(
+            name: str, coro: Any
+        ) -> tuple[str, list[dict[str, Any]]]:
+            models = await asyncio.wait_for(coro, timeout=fb_timeout)
+            return name, models
+
+        tasks = [
+            asyncio.create_task(_run("llmpricing", self._fetch_llmpricing())),
+            asyncio.create_task(_run("modelgrep", self._fetch_modelgrep())),
+        ]
+        errors: list[str] = []
+        pending = set(tasks)
+
+        try:
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    exc = task.exception()
+                    if exc is None:
+                        src, models = task.result()
+                        for p in pending:
+                            p.cancel()
+                        logger.info(
+                            f"[ai_iq] 临时回退 {src} 成功（{len(models)} 条，耗时 {time.monotonic() - t0:.1f}s）"
+                        )
+                        return models, src
+                    errors.append(_fmt_exc(exc))
+        finally:
+            for p in pending:
+                p.cancel()
+
+        raise RuntimeError(f"所有回退数据源均失败: {' | '.join(errors)}")
 
     async def _fetch_remote(
         self, prefer_source: str, *, allow_custom: bool = True
@@ -834,7 +883,7 @@ class ModelDataFetcher:
                 if prefer_source != "auto":
                     raise
                 logger.warning(
-                    f"[ai_iq] 自定义 API 拉取失败，回退内置主源: {custom_exc}"
+                    f"[ai_iq] 自定义 API 拉取失败，回退内置主源: {_fmt_exc(custom_exc)}"
                 )
 
         if prefer_source == "artificial_analysis":
@@ -842,24 +891,17 @@ class ModelDataFetcher:
             return models, src, False
 
         # auto: try Artificial Analysis first (has reasoning effort breakdown),
-        # temporarily fallback to llmpricing.dev -> modelgrep if AA is unreachable
+        # temporarily fallback to concurrent llmpricing.dev / modelgrep race if AA is unreachable
         # (do NOT poison cache with degraded fallback).
         try:
             models, src = await self._fetch_artificial_analysis()
             return models, src, False
         except Exception as aa_exc:
             logger.warning(
-                f"[ai_iq] Artificial Analysis 拉取失败，临时回退 llmpricing.dev（不写入缓存）: {aa_exc}"
+                f"[ai_iq] Artificial Analysis 拉取失败，并发回退 llmpricing.dev / modelgrep（不写入缓存）: {_fmt_exc(aa_exc)}"
             )
-            try:
-                models = await self._fetch_llmpricing()
-                return models, "llmpricing", True
-            except Exception as lp_exc:
-                logger.warning(
-                    f"[ai_iq] llmpricing.dev 回退失败，继续回退 modelgrep: {lp_exc}"
-                )
-                models = await self._fetch_modelgrep()
-                return models, "modelgrep", True
+            models, fb_src = await self._fetch_fallback_race()
+            return models, fb_src, True
 
     @staticmethod
     def _is_degraded_cache(prefer: str, cached_source: str) -> bool:
@@ -934,7 +976,8 @@ class ModelDataFetcher:
                     is_fallback=is_fallback,
                 )
             except Exception as exc:
-                logger.error(f"[ai_iq] 获取远程模型数据失败 ({prefer}): {exc}")
+                err_msg = _fmt_exc(exc)
+                logger.error(f"[ai_iq] 获取远程模型数据失败 ({prefer}): {err_msg}")
                 fallback = mem or disk_cache
                 if fallback is not None:
                     return FetchResult(
@@ -943,6 +986,6 @@ class ModelDataFetcher:
                         source=fallback[2],
                         from_cache=True,
                         is_stale=True,
-                        error=str(exc),
+                        error=err_msg,
                     )
                 raise

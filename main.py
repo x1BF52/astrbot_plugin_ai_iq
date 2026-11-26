@@ -213,8 +213,13 @@ class AIIQPlugin(Star):
                 source_override=source_override,
             )
         except Exception as exc:
-            logger.error(f"[ai_iq] 拉取模型数据异常: {exc}")
-            yield event.plain_result(f"获取实时模型智商数据失败：{exc}")
+            err_msg = (
+                f"{type(exc).__name__}: {exc}"
+                if str(exc).strip()
+                else type(exc).__name__
+            )
+            logger.error(f"[ai_iq] 拉取模型数据异常: {err_msg}")
+            yield event.plain_result(f"获取实时模型智商数据失败：{err_msg}")
             return
 
         max_per_maker = max(1, int(self.config.get("max_per_maker", 6)))
