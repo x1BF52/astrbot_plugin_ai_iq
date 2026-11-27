@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    display: inline-block;
+    width: 1090px;
+    background: #eef2f7;
+    padding: 18px 20px 14px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+    padding: 0 2px;
+  }
+  .title {
+    font-size: 30px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.3px;
+    line-height: 1.1;
+  }
+  .subtitle {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.3;
+    text-align: right;
+  }
+
+  /* Matrix Layout: Vendor Sections */
+  .sections {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .vendor-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1.5px solid #dde4ee;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+  .vendor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 16px;
+    background: var(--bg);
+    border-bottom: 1.5px solid var(--border);
+  }
+  .vendor-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 16.5px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.1px;
+  }
+  .vendor-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .vendor-meta {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .model-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #eef2f7;
+  }
+  .model-row:last-child {
+    border-bottom: none;
+  }
+  .model-info {
+    width: 192px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+  }
+  .model-name {
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #0f172a;
+    overflow-wrap: break-word;
+  }
+  .api-price-row {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .api-price {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--pill_bg);
+    padding: 2px 7px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+  .api-unit {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .effort-grid {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tile {
+    width: 156px;
+    border-radius: 10px;
+    border: 1.4px solid #e2e8f0;
+    background: #f8fafc;
+    padding: 8px 9px 7px 9px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 5px;
+  }
+  /* Progressive tile container fade-to-gray scale */
+  .tile.tier-extreme,
+  .tile.tier-ultra,
+  .tile.tier-max {
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .tile.tier-xhigh {
+    background: var(--bg-xhigh);
+    border-color: var(--border-xhigh);
+  }
+  .tile.tier-high,
+  .tile.tier-reasoning,
+  .tile.tier-default {
+    background: var(--bg-soft);
+    border-color: var(--border-soft);
+  }
+  .tile.tier-medium {
+    background: #f8fafc;
+    border-color: #dce3ec;
+  }
+  .tile.tier-low,
+  .tile.tier-minimal,
+  .tile.tier-non-reasoning {
+    background: #f8fafc;
+    border-color: #e6ecf2;
+  }
+  .tile-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .effort-pill {
+    display: inline-block;
+    font-size: 10.5px;
+    line-height: 1.25;
+    font-weight: 800;
+    letter-spacing: 0.15px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--pill_bg);
+    border: 1px solid var(--border);
+  }
+  /* Progressive badge fade-to-gray scale: extreme/ultra -> max -> xhigh -> high -> medium -> low -> non-reasoning */
+  .effort-pill.effort-extreme,
+  .effort-pill.effort-ultra {
+    background: var(--accent-deep);
+    color: #ffffff;
+    border-color: var(--accent-deep);
+  }
+  .effort-pill.effort-max {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+  }
+  .effort-pill.effort-xhigh {
+    background: var(--accent-xhigh);
+    color: #ffffff;
+    border-color: var(--accent-xhigh);
+  }
+  .effort-pill.effort-high {
+    background: var(--pill_bg);
+    color: var(--accent);
+    border-color: var(--border);
+  }
+  .effort-pill.effort-reasoning,
+  .effort-pill.effort-default {
+    background: var(--pill_bg);
+    color: var(--accent);
+    border-color: var(--border);
+    text-transform: none;
+  }
+  .effort-pill.effort-medium {
+    background: #e9eef4;
+    color: #475569;
+    border-color: #cbd5e1;
+    font-weight: 700;
+  }
+  .effort-pill.effort-low,
+  .effort-pill.effort-minimal {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #dde4ec;
+    font-weight: 700;
+  }
+  .effort-pill.effort-non-reasoning {
+    background: #f4f6f9;
+    color: #94a3b8;
+    border-color: #e2e8f0;
+    font-weight: 700;
+    text-transform: none;
+  }
+  .task-cost {
+    font-size: 16.5px;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.3px;
+  }
+  .tile-mid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tile-score {
+    font-size: 33px;
+    line-height: 1.0;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-track {
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+  .tile.tier-xhigh .bar-fill {
+    background: var(--accent-xhigh);
+  }
+  .tile.tier-high .bar-fill,
+  .tile.tier-reasoning .bar-fill,
+  .tile.tier-default .bar-fill {
+    background: var(--bar-high);
+  }
+  .tile.tier-medium .bar-fill {
+    background: var(--bar-med);
+  }
+  .tile.tier-low .bar-fill,
+  .tile.tier-minimal .bar-fill {
+    background: #94a3b8;
+  }
+  .tile.tier-non-reasoning .bar-fill {
+    background: #cbd5e1;
+  }
+  .tile-perf {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Ranking Layout: 3-Column High-Readability Grid */
+  .rank-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 11px;
+  }
+  .rank-card {
+    position: relative;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    padding: 13px 14px 11px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  }
+  .rank-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4.5px;
+    background: var(--accent);
+  }
+  .rank-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .rank-name-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+  .rank-badge {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .rank-name {
+    font-size: 17px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #0f172a;
+    overflow-wrap: break-word;
+  }
+  .rank-body {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .rank-score-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .rank-score {
+    font-size: 36px;
+    line-height: 1.0;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.9px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rank-metrics {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .rank-cost {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  .rank-price {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+  }
+  .rank-perf {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 12px;
+    padding: 0 4px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">{{ title }}</div>
+    <div class="subtitle">{{ subtitle }}</div>
+  </div>
+
+  {% if layout == 'matrix' %}
+  <div class="sections">
+    {% for sec in sections %}
+    <div class="vendor-card" style="{{ sec.css_vars }}">
+      <div class="vendor-header">
+        <div class="vendor-title"><span class="vendor-dot"></span>{{ sec.label }}</div>
+        <div class="vendor-meta">{{ sec.models | length }} 个系列 · {{ sec.tile_count }} 个档位</div>
+      </div>
+      {% for model in sec.models %}
+      <div class="model-row">
+        <div class="model-info">
+          <div class="model-name">{{ model.name }}</div>
+          <div class="api-price-row">
+            <span class="api-price">{{ model.price }}</span>
+            {% if not model.is_free and model.price != '--' %}<span class="api-unit">/1M</span>{% endif %}
+          </div>
+        </div>
+        <div class="effort-grid">
+          {% for t in model.efforts %}
+          <div class="tile tier-{{ t.effort_key or 'default' }}">
+            <div class="tile-top">
+              {% if t.effort %}<span class="effort-pill effort-{{ t.effort_key or 'default' }}">{{ t.effort }}</span>{% endif %}
+              {% if t.task_cost %}<span class="task-cost">{{ t.task_cost }}</span>{% endif %}
+            </div>
+            <div class="tile-mid">
+              <div class="tile-score">{{ t.score }}</div>
+              <div class="bar-track"><div class="bar-fill" style="width: {{ t.bar_pct }}%;"></div></div>
+            </div>
+            <div class="tile-perf">{{ t.perf }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="rank-grid">
+    {% for c in ranking_cards %}
+    <div class="rank-card" style="{{ c.css_vars }}">
+      <div class="rank-top">
+        <div class="rank-name-wrap">
+          {% if c.badge %}<span class="rank-badge">{{ c.badge }}</span>{% endif %}
+          <span class="rank-name">{{ c.name }}</span>
+        </div>
+        {% if c.effort %}<span class="effort-pill effort-{{ c.effort_key or 'default' }}">{{ c.effort }}</span>{% endif %}
+      </div>
+      <div class="rank-body">
+        <div class="rank-score-col">
+          <div class="rank-score">{{ c.score }}</div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ c.bar_pct }}%;"></div></div>
+        </div>
+        <div class="rank-metrics">
+          {% if c.task_cost %}<div class="rank-cost">{{ c.task_cost }}</div>{% endif %}
+          <div class="rank-price">{{ c.price }}</div>
+          <div class="rank-perf">{{ c.perf }}</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="footer">
+    <span>数据来源：{{ source_label }} · 共展示 {{ total_cards }} 个配置</span>
+    <span>更新于 {{ updated_str }}{{ stale_note }}</span>
+  </div>
+</body>
+</html>
