@@ -4,8 +4,8 @@ short_desc: 一条指令查询全球主流 AI 模型的实时智商评分、推�
 desc: |
   查询全球主流 AI 模型（Claude / GPT / Gemini / DeepSeek / Qwen / GLM / Kimi / Grok 等）的实时智商评分、各推理强度档位（max / xhigh / high / medium / low / 无推理）、API 单价与题均成本、输出速度与首答延迟，并以分组配色卡片图直观呈现，方便快速选模型与档位干活。
 
-  自动过滤旧代与过期模型（如已有 Fable 5.2 时自动隐藏 5.1，隐藏 Gemini 3.x / DeepSeek 0423 等旧模型）。支持 `/aiiq` 总览、`/aiiq <厂商/推理强度>` 筛选、`/aiiq 编程`、`/aiiq 性价比`、`/aiiq 免费`。
-version: 1.4.3
+  自动过滤旧代与过期模型（如已有 Fable 5.2 时自动隐藏 5.1，隐藏 Gemini 3.x / DeepSeek 0423 等旧模型）。支持 `/aiiq` 总览、`/aiiq <厂商/推理强度>` 筛选、`/aiiq 编程`、`/aiiq 性价比`、`/aiiq 硬核`、`/aiiq 免费`。
+version: 1.5.0
 author: x1BF52
 repo: https://github.com/x1BF52/astrbot_plugin_ai_iq
 social_link: https://github.com/x1BF52

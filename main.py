@@ -11,13 +11,25 @@ try:
 except ImportError:  # pragma: no cover
     StarTools = None  # type: ignore[assignment]
 
-from .fetcher import ModelDataFetcher
-from .renderer import HTML_TEMPLATE, build_view_data, format_text_fallback
+from .fetcher import ModelDataFetcher, format_exc, normalize_creator
+from .renderer import HTML_TEMPLATE, MAKER_ALIASES, build_view_data, format_text_fallback
 
 _MSG_ID_PATTERN = re.compile(r"\s*\[MSG_ID:[^\]]*\]\s*")
 _TRIGGER_SPLIT_RE = re.compile(r"[,，、;；\n]+")
+_REFRESH_KEYWORDS = {"refresh", "刷新"}
 _FREE_KEYWORDS = {"free", "免费", "白嫖"}
 _GECKO_KEYWORDS = {"gecko", "benchgecko", "硬核", "多榜"}
+
+DEFAULT_MAKERS: tuple[str, ...] = (
+    "anthropic",
+    "openai",
+    "google",
+    "deepseek",
+    "qwen",
+    "z-ai",
+    "moonshotai",
+    "x-ai",
+)
 
 
 def _build_help_text(primary_cmd: str, all_triggers: tuple[str, ...]) -> str:
@@ -80,11 +92,14 @@ class AIIQPlugin(Star):
         makers: list[str] = []
         seen: set[str] = set()
 
-        def _add(item: str) -> None:
-            key = item.strip().lower()
-            if key and key not in seen:
-                seen.add(key)
-                makers.append(key)
+        def _add(raw_item: str) -> None:
+            raw_key = raw_item.strip().lower()
+            if not raw_key:
+                return
+            canonical = MAKER_ALIASES.get(raw_key) or normalize_creator(raw_key)
+            if canonical and canonical != "other" and canonical not in seen:
+                seen.add(canonical)
+                makers.append(canonical)
 
         selected = self.config.get("selected_makers")
         if isinstance(selected, list):
@@ -96,10 +111,7 @@ class AIIQPlugin(Star):
         else:
             # Backwards compatibility with older default_makers string config
             legacy = str(
-                self.config.get(
-                    "default_makers",
-                    "anthropic,openai,google,deepseek,qwen,z-ai,moonshotai,x-ai",
-                )
+                self.config.get("default_makers", ",".join(DEFAULT_MAKERS))
             )
             for part in _TRIGGER_SPLIT_RE.split(legacy):
                 _add(part)
@@ -109,16 +121,7 @@ class AIIQPlugin(Star):
             for part in _TRIGGER_SPLIT_RE.split(custom):
                 _add(part)
 
-        return makers or [
-            "anthropic",
-            "openai",
-            "google",
-            "deepseek",
-            "qwen",
-            "z-ai",
-            "moonshotai",
-            "x-ai",
-        ]
+        return makers or list(DEFAULT_MAKERS)
 
     def _get_trigger_keywords(self) -> tuple[str, ...]:
         raw = str(self.config.get("trigger_keywords", "aiiq") or "aiiq")
@@ -188,24 +191,21 @@ class AIIQPlugin(Star):
             yield event.plain_result(_build_help_text(primary_cmd, triggers))
             return
 
-        force_refresh = False
-        if arg.lower() in {"refresh", "刷新"}:
-            force_refresh = True
-            arg = ""
-        elif arg.lower().startswith("refresh ") or arg.startswith("刷新 "):
-            force_refresh = True
-            arg = arg.split(maxsplit=1)[1].strip()
+        # Extract refresh flag anywhere in tokens (supports `/aiiq 刷新`, `/aiiq 免费 刷新`, etc.)
+        tokens = [t for t in arg.split() if t]
+        force_refresh = any(t.lower() in _REFRESH_KEYWORDS for t in tokens)
+        if force_refresh:
+            tokens = [t for t in tokens if t.lower() not in _REFRESH_KEYWORDS]
 
         # Route special commands to dedicated upstream sources
-        tokens = [t for t in arg.split() if t]
         tokens_lower = {t.lower() for t in tokens}
         source_override: str | None = None
         if tokens_lower & _FREE_KEYWORDS:
             source_override = "modelgrep"
         elif tokens_lower & _GECKO_KEYWORDS:
             source_override = "benchgecko"
-            remaining = [t for t in tokens if t.lower() not in _GECKO_KEYWORDS]
-            arg = " ".join(remaining).strip()
+            tokens = [t for t in tokens if t.lower() not in _GECKO_KEYWORDS]
+        arg = " ".join(tokens).strip()
 
         try:
             result = await self.fetcher.get_models(
@@ -213,11 +213,7 @@ class AIIQPlugin(Star):
                 source_override=source_override,
             )
         except Exception as exc:
-            err_msg = (
-                f"{type(exc).__name__}: {exc}"
-                if str(exc).strip()
-                else type(exc).__name__
-            )
+            err_msg = format_exc(exc)
             logger.error(f"[ai_iq] 拉取模型数据异常: {err_msg}")
             yield event.plain_result(f"获取实时模型智商数据失败：{err_msg}")
             return
@@ -248,9 +244,14 @@ class AIIQPlugin(Star):
         )
 
         if view_data["total_cards"] == 0:
-            yield event.plain_result(
-                f"未找到与「{arg}」匹配的在役带跑分模型，试试 `/{primary_cmd} gemini`、`/{primary_cmd} deepseek`、`/{primary_cmd} 全部 {arg}` 或 `/{primary_cmd}` 查看总览。"
-            )
+            if arg:
+                yield event.plain_result(
+                    f"未找到与「{arg}」匹配的在役带跑分模型，试试 `/{primary_cmd} gemini`、`/{primary_cmd} deepseek`、`/{primary_cmd} 全部 {arg}` 或 `/{primary_cmd}` 查看总览。"
+                )
+            else:
+                yield event.plain_result(
+                    f"当前筛选条件下暂无可展示的在役带跑分模型，试试 `/{primary_cmd} 全部` 或检查插件配置页中的厂商勾选。"
+                )
             return
 
         try:
@@ -265,7 +266,7 @@ class AIIQPlugin(Star):
             )
             yield event.image_result(img_url)
         except Exception as exc:
-            logger.warning(f"[ai_iq] HTML 渲染图片失败，降级为文本输出: {exc}")
+            logger.warning(f"[ai_iq] HTML 渲染图片失败，降级为文本输出: {format_exc(exc)}")
             yield event.plain_result(format_text_fallback(view_data))
 
     async def terminate(self):
